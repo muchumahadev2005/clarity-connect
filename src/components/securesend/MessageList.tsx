@@ -27,18 +27,18 @@ function TypeIcon({ type }: { type: SecureMessage["type"] }) {
 function ProtectionBadge({ m }: { m: SecureMessage }) {
   if (m.protection === "password")
     return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-primary-soft px-2 py-0.5 text-[11px] font-medium text-accent-foreground">
+      <span className="inline-flex items-center gap-1 rounded-full bg-primary-soft px-2 py-0.5 text-[11px] font-medium text-primary ring-1 ring-primary/20">
         <Lock className="h-3 w-3" /> Password
       </span>
     );
   if (m.protection === "key")
     return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-warning/20 px-2 py-0.5 text-[11px] font-medium text-warning-foreground">
-        <KeyRound className="h-3 w-3" /> Key
+      <span className="inline-flex items-center gap-1 rounded-full bg-key-soft px-2 py-0.5 text-[11px] font-medium text-key ring-1 ring-key/20">
+        <KeyRound className="h-3 w-3" /> Secret Key
       </span>
     );
   return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-success/15 px-2 py-0.5 text-[11px] font-medium text-success">
+    <span className="inline-flex items-center gap-1 rounded-full bg-success-soft px-2 py-0.5 text-[11px] font-medium text-success ring-1 ring-success/20">
       <Sparkles className="h-3 w-3" /> Quick
     </span>
   );
