@@ -190,6 +190,10 @@
   .animate-fade-in { animation: fade-in 0.25s ease-out; }
   .animate-slide-up { animation: slide-up 0.3s ease-out; }
   .animate-scale-in { animation: scale-in 0.18s ease-out; }
+  .animate-glow-pulse { animation: glow-pulse 2.4s ease-in-out infinite; }
+  .animate-unlock { animation: unlock 0.6s ease-out; }
+  .animate-blur-in { animation: blur-in 0.6s ease-out forwards; }
+  .animate-waveform span { animation: wave 1.1s ease-in-out infinite; }
   @keyframes fade-in {
     from { opacity: 0; transform: translateY(4px); }
     to { opacity: 1; transform: translateY(0); }
@@ -201,5 +205,22 @@
   @keyframes scale-in {
     from { opacity: 0; transform: scale(0.96); }
     to { opacity: 1; transform: scale(1); }
+  }
+  @keyframes glow-pulse {
+    0%,100% { box-shadow: 0 0 0 0 oklch(0.585 0.176 256 / 0.35), 0 0 24px -4px oklch(0.585 0.176 256 / 0.5); }
+    50% { box-shadow: 0 0 0 10px oklch(0.585 0.176 256 / 0), 0 0 36px 0 oklch(0.585 0.176 256 / 0.7); }
+  }
+  @keyframes unlock {
+    0% { transform: scale(1) rotate(0); }
+    40% { transform: scale(1.15) rotate(-12deg); }
+    100% { transform: scale(1) rotate(0); }
+  }
+  @keyframes blur-in {
+    from { filter: blur(14px); opacity: 0.6; }
+    to { filter: blur(0); opacity: 1; }
+  }
+  @keyframes wave {
+    0%,100% { transform: scaleY(0.4); }
+    50% { transform: scaleY(1); }
   }
 }
