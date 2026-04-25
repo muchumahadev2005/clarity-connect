@@ -12,9 +12,12 @@ import {
   ShieldCheck,
   Square,
   Circle,
+  Link2,
+  Send,
 } from "lucide-react";
 import type { MessageType, ProtectionMode } from "./types";
 import { cn } from "@/lib/utils";
+import { UserSearch } from "./UserSearch";
 
 interface Props {
   open: boolean;
@@ -27,6 +30,8 @@ interface Props {
     expiry: number; // minutes
     viewOnce: boolean;
     link: string;
+    sendMode: "link" | "direct";
+    recipient: string | null;
   }) => void;
 }
 
@@ -47,6 +52,8 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
   const [viewOnce, setViewOnce] = useState(false);
   const [recording, setRecording] = useState(false);
   const [fileName, setFileName] = useState<string | null>(null);
+  const [sendMode, setSendMode] = useState<"link" | "direct">("link");
+  const [recipient, setRecipient] = useState<string | null>(null);
 
   if (!open) return null;
 
@@ -59,6 +66,8 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
     setViewOnce(false);
     setRecording(false);
     setFileName(null);
+    setSendMode("link");
+    setRecipient(null);
   };
 
   const submit = () => {
@@ -66,7 +75,7 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
       tab === "text" ? text : tab === "voice" ? "Voice note · 0:24" : fileName ?? "attachment.bin";
     if (!content.trim()) return;
     const link = `https://securesend.app/m/${Math.random().toString(36).slice(2, 10)}`;
-    onEncrypt({ type: tab, content, protection, password, expiry, viewOnce, link });
+    onEncrypt({ type: tab, content, protection, password, expiry, viewOnce, link, sendMode, recipient });
     reset();
   };
 
