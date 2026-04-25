@@ -73,6 +73,23 @@ export const initialMessages: SecureMessage[] = [
     stealth: true,
   },
   {
+    id: "m7",
+    folder: "inbox",
+    sender: "Elena Rossi",
+    preview: "Board meeting prep notes",
+    content:
+      "Quick heads-up before tomorrow's board sync: the revised forecast lands at +12% YoY. Please keep this between us until the official deck drops.",
+    type: "text",
+    protection: "firstAccess",
+    expiresAt: inFuture(180),
+    viewOnce: false,
+    status: "new",
+    timestamp: inPast(15),
+    views: 0,
+    logs: [],
+    accessed: false,
+  },
+  {
     id: "m5",
     folder: "sent",
     sender: "You → finance@acme.co",

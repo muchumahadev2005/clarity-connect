@@ -14,6 +14,8 @@ import {
   Circle,
   Link2,
   Send,
+  Zap,
+  AlertTriangle,
 } from "lucide-react";
 import type { MessageType, ProtectionMode } from "./types";
 import { cn } from "@/lib/utils";
@@ -179,12 +181,13 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
             <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               Protection
             </p>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
               {(
                 [
                   { id: "quick", label: "Quick", icon: Sparkles },
                   { id: "password", label: "Password", icon: Lock },
                   { id: "key", label: "Secret Key", icon: KeyRound },
+                  { id: "firstAccess", label: "First Access", icon: Zap },
                 ] as const
               ).map((p) => (
                 <button
@@ -193,7 +196,9 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
                   className={cn(
                     "flex flex-col items-center gap-1 rounded-xl border px-3 py-3 text-xs transition",
                     protection === p.id
-                      ? "border-primary bg-primary-soft text-accent-foreground font-medium"
+                      ? p.id === "firstAccess"
+                        ? "border-flash bg-flash-soft text-flash-foreground font-medium"
+                        : "border-primary bg-primary-soft text-accent-foreground font-medium"
                       : "border-border hover:bg-secondary",
                   )}
                 >
@@ -202,13 +207,23 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
                 </button>
               ))}
             </div>
-            {protection !== "quick" && (
+            {(protection === "password" || protection === "key") && (
               <input
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder={protection === "key" ? "Generate or paste a key…" : "Set a password"}
                 className="mt-2 w-full rounded-xl border border-border bg-surface px-3 py-2 text-sm font-mono outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
               />
+            )}
+            {protection === "firstAccess" && (
+              <div className="mt-2 flex items-start gap-2 rounded-xl border border-flash/40 bg-flash-soft px-3 py-2.5 text-xs text-flash-foreground animate-fade-in">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-flash" />
+                <p>
+                  <span className="font-semibold">⚡ One-time view.</span> This message will
+                  automatically unlock for the first viewer only. After it is opened once, it
+                  cannot be viewed again.
+                </p>
+              </div>
             )}
           </div>
 
