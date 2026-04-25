@@ -1,7 +1,8 @@
-import { Lock, KeyRound, Eye, Mic, FileText, Paperclip, Search, EyeOff, Sparkles } from "lucide-react";
+import { Lock, KeyRound, Eye, FileText, Paperclip, Search, EyeOff, Sparkles } from "lucide-react";
 import type { Folder, SecureMessage } from "./types";
 import { cn } from "@/lib/utils";
 import { timeAgo } from "./utils";
+import { VoicePreview } from "./VoicePlayer";
 
 interface Props {
   folder: Folder;
@@ -20,8 +21,8 @@ const folderTitle: Record<Folder, string> = {
 };
 
 function TypeIcon({ type }: { type: SecureMessage["type"] }) {
-  const I = type === "voice" ? Mic : type === "file" ? FileText : Paperclip;
-  return <I className="h-3.5 w-3.5" />;
+  const I = type === "file" ? FileText : Paperclip;
+  return <I className="inline h-3.5 w-3.5" />;
 }
 
 function ProtectionBadge({ m }: { m: SecureMessage }) {
@@ -78,8 +79,11 @@ export function MessageList({ folder, messages, selectedId, onSelect, query, onQ
                   <button
                     onClick={() => onSelect(m.id)}
                     className={cn(
-                      "group flex w-full gap-3 border-b border-border/60 px-5 py-3.5 text-left transition-colors",
-                      isActive ? "bg-primary-soft" : "hover:bg-secondary",
+                      "group flex w-full gap-3 border-b border-border/60 px-5 py-3.5 text-left transition-all",
+                      "hover:translate-x-0.5",
+                      isActive
+                        ? "bg-primary-soft border-l-2 border-l-primary"
+                        : "hover:bg-secondary border-l-2 border-l-transparent",
                       m.status === "new" && "font-medium",
                     )}
                   >
@@ -94,10 +98,16 @@ export function MessageList({ folder, messages, selectedId, onSelect, query, onQ
                         </span>
                       </div>
                       <p className="mt-0.5 truncate text-sm text-muted-foreground">
-                        <TypeIcon type={m.type} />{" "}
-                        <span className="align-middle">
-                          {m.stealth ? "Looks like a routine status update…" : m.preview}
-                        </span>
+                        {m.type === "voice" ? (
+                          <VoicePreview duration={32} />
+                        ) : (
+                          <>
+                            <TypeIcon type={m.type} />{" "}
+                            <span className="align-middle">
+                              {m.stealth ? "Looks like a routine status update…" : m.preview}
+                            </span>
+                          </>
+                        )}
                       </p>
                       <div className="mt-2 flex flex-wrap items-center gap-1.5">
                         <ProtectionBadge m={m} />
