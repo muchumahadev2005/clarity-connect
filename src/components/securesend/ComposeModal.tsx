@@ -262,6 +262,55 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
               />
             </button>
           </label>
+
+          {/* Send mode */}
+          <div>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Delivery
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              {(
+                [
+                  { id: "link", label: "Generate Link", desc: "Share via URL", icon: Link2 },
+                  { id: "direct", label: "Send Directly", desc: "To a user", icon: Send },
+                ] as const
+              ).map((m) => (
+                <button
+                  key={m.id}
+                  onClick={() => setSendMode(m.id)}
+                  className={cn(
+                    "flex items-start gap-3 rounded-xl border px-3 py-3 text-left transition",
+                    sendMode === m.id
+                      ? "border-primary bg-primary-soft"
+                      : "border-border hover:bg-secondary",
+                  )}
+                >
+                  <m.icon
+                    className={cn(
+                      "mt-0.5 h-4 w-4",
+                      sendMode === m.id ? "text-primary" : "text-muted-foreground",
+                    )}
+                  />
+                  <div>
+                    <p
+                      className={cn(
+                        "text-sm font-medium",
+                        sendMode === m.id && "text-primary",
+                      )}
+                    >
+                      {m.label}
+                    </p>
+                    <p className="text-[11px] text-muted-foreground">{m.desc}</p>
+                  </div>
+                </button>
+              ))}
+            </div>
+            {sendMode === "direct" && (
+              <div className="mt-2 animate-fade-in">
+                <UserSearch selected={recipient} onSelect={setRecipient} />
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Footer */}
@@ -269,9 +318,11 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
           <span className="text-xs text-muted-foreground">Encrypted in your browser</span>
           <button
             onClick={submit}
-            className="inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground shadow-elegant hover:opacity-95 transition"
+            disabled={sendMode === "direct" && !recipient}
+            className="inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground shadow-elegant transition-all hover:opacity-95 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <ShieldCheck className="h-4 w-4" /> Encrypt & Generate Link
+            <ShieldCheck className="h-4 w-4" />
+            {sendMode === "direct" ? "Encrypt & Send" : "Encrypt & Generate Link"}
           </button>
         </div>
       </div>
