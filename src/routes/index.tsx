@@ -150,7 +150,7 @@ function SecureSendApp() {
           const newMsg: SecureMessage = {
             id: `new-${Date.now()}`,
             folder: "sent",
-            sender: "You → recipient",
+            sender: p.sendMode === "direct" && p.recipient ? `You → ${p.recipient}` : "You → recipient",
             preview: p.type === "text" ? p.content.slice(0, 60) : p.content,
             content: p.content,
             type: p.type,
@@ -165,16 +165,18 @@ function SecureSendApp() {
           };
           setMessages((m) => [newMsg, ...m]);
           setComposeOpen(false);
-          setShare({
-            open: true,
-            link: p.link,
-            summary: {
-              protection:
-                p.protection === "password" ? "Password" : p.protection === "key" ? "Secret key" : "Quick",
-              expiry: expiryLabel,
-              viewOnce: p.viewOnce,
-            },
-          });
+          if (p.sendMode === "link") {
+            setShare({
+              open: true,
+              link: p.link,
+              summary: {
+                protection:
+                  p.protection === "password" ? "Password" : p.protection === "key" ? "Secret key" : "Quick",
+                expiry: expiryLabel,
+                viewOnce: p.viewOnce,
+              },
+            });
+          }
         }}
       />
 
