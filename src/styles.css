@@ -58,6 +58,9 @@
   --color-key-soft: var(--key-soft);
   --color-success-soft: var(--success-soft);
   --color-warning-soft: var(--warning-soft);
+  --color-flash: var(--flash);
+  --color-flash-foreground: var(--flash-foreground);
+  --color-flash-soft: var(--flash-soft);
   --shadow-elegant: var(--shadow-elegant);
   --shadow-floating: var(--shadow-floating);
   --shadow-glow-primary: var(--shadow-glow-primary);
@@ -104,6 +107,10 @@
   --warning: oklch(0.78 0.15 80);
   --warning-foreground: oklch(0.25 0.05 80);
   --warning-soft: oklch(0.96 0.06 80);
+  /* Flash / first-access orange */
+  --flash: oklch(0.7 0.18 55);
+  --flash-foreground: oklch(0.28 0.08 55);
+  --flash-soft: oklch(0.96 0.06 65);
   /* Key / secret-key purple */
   --key: oklch(0.55 0.22 295);
   --key-foreground: oklch(1 0 0);

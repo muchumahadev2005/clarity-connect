@@ -1,6 +1,6 @@
 export type MessageType = "text" | "voice" | "file";
 export type Folder = "inbox" | "sent" | "expired" | "logs";
-export type ProtectionMode = "quick" | "password" | "key";
+export type ProtectionMode = "quick" | "password" | "key" | "firstAccess";
 
 export interface AccessLog {
   viewedAt: string;
@@ -24,4 +24,6 @@ export interface SecureMessage {
   views: number;
   logs: AccessLog[];
   stealth?: boolean;
+  /** For "firstAccess" protection: set true once the message has been opened. */
+  accessed?: boolean;
 }
