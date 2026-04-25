@@ -383,3 +383,59 @@ function UnlockedBody({
     </div>
   );
 }
+
+function FirstAccessUnlocking() {
+  return (
+    <div className="mx-auto flex max-w-md flex-col items-center text-center animate-scale-in">
+      <div className="relative">
+        <div className="absolute inset-0 rounded-full bg-flash/40 blur-2xl" />
+        <div className="relative flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-flash to-[oklch(0.62_0.2_40)] text-white animate-unlock shadow-elegant">
+          <Unlock className="h-9 w-9" />
+        </div>
+      </div>
+      <h3 className="mt-6 flex items-center gap-2 text-xl font-semibold tracking-tight">
+        <Loader2 className="h-4 w-4 animate-spin text-flash" />
+        Unlocking secure message…
+      </h3>
+      <p className="mt-1.5 text-sm text-muted-foreground">
+        First-access auto unlock in progress. This message will not be available again.
+      </p>
+    </div>
+  );
+}
+
+function FirstAccessBanner() {
+  return (
+    <div className="mb-5 flex items-start gap-2 rounded-xl border border-flash/40 bg-flash-soft px-4 py-3 text-xs text-flash-foreground animate-fade-in">
+      <Zap className="mt-0.5 h-4 w-4 shrink-0 text-flash" />
+      <span>
+        <span className="font-semibold">One-time view enabled</span> — this message will disappear
+        after viewing.
+      </span>
+    </div>
+  );
+}
+
+function AlreadyAccessedState({ onBack }: { onBack: () => void }) {
+  return (
+    <div className="mx-auto flex max-w-md flex-col items-center text-center animate-fade-in">
+      <div className="relative">
+        <div className="absolute inset-0 rounded-full bg-destructive/30 blur-2xl" />
+        <div className="relative flex h-16 w-16 items-center justify-center rounded-full bg-destructive/10 text-destructive ring-1 ring-destructive/30">
+          <AlertTriangle className="h-8 w-8" />
+        </div>
+      </div>
+      <h3 className="mt-5 text-lg font-semibold">This message has already been accessed</h3>
+      <p className="mt-1 max-w-sm text-sm text-muted-foreground">
+        For security reasons, this message is no longer available. First-access messages can only
+        be opened once.
+      </p>
+      <button
+        onClick={onBack}
+        className="mt-5 inline-flex items-center gap-2 rounded-full border border-border bg-surface px-4 py-2 text-sm font-medium text-foreground/80 transition-all hover:bg-secondary active:scale-95"
+      >
+        <ArrowLeft className="h-4 w-4" /> Go Back
+      </button>
+    </div>
+  );
+}
