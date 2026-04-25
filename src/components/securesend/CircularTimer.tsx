@@ -25,6 +25,7 @@ export function CircularTimer({ remainingMs, totalMs, expired }: Props) {
 
   return (
     <div
+      suppressHydrationWarning
       className={`flex items-center gap-3 rounded-2xl border px-3 py-2 ${
         expired || urgent
           ? "border-destructive/30 bg-destructive/5"

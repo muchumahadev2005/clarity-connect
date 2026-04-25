@@ -33,7 +33,7 @@ export function AccessLogs({ messages }: { messages: SecureMessage[] }) {
                 <div className="rounded-2xl border border-border bg-surface-muted/60 p-4 transition-all hover:border-primary/40 hover:shadow-elegant">
                   <div className="flex items-start justify-between gap-3">
                     <p className="truncate text-sm font-semibold">{entry.message.preview}</p>
-                    <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-surface px-2 py-0.5 text-[11px] text-muted-foreground">
+                    <span suppressHydrationWarning className="inline-flex shrink-0 items-center gap-1 rounded-full bg-surface px-2 py-0.5 text-[11px] text-muted-foreground">
                       <Clock className="h-3 w-3" /> {timeAgo(entry.viewedAt)}
                     </span>
                   </div>

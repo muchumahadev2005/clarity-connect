@@ -93,7 +93,7 @@ export function MessageList({ folder, messages, selectedId, onSelect, query, onQ
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between gap-2">
                         <span className="truncate text-sm">{m.sender}</span>
-                        <span className="shrink-0 text-[11px] text-muted-foreground">
+                        <span suppressHydrationWarning className="shrink-0 text-[11px] text-muted-foreground">
                           {timeAgo(m.timestamp)}
                         </span>
                       </div>

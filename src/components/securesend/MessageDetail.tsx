@@ -101,7 +101,7 @@ export function MessageDetail({ message, onDelete, onMarkViewed }: Props) {
           </h2>
           <p className="mt-0.5 text-sm text-muted-foreground">
             From <span className="font-medium text-foreground">{message.sender}</span> ·{" "}
-            {timeAgo(message.timestamp)}
+            <span suppressHydrationWarning>{timeAgo(message.timestamp)}</span>
           </p>
         </div>
         <div className="flex items-center gap-1">
