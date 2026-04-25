@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Toaster } from "sonner";
+import { ArrowLeft } from "lucide-react";
 import { Sidebar } from "@/components/securesend/Sidebar";
 import { MessageList } from "@/components/securesend/MessageList";
 import { MessageDetail } from "@/components/securesend/MessageDetail";
@@ -21,6 +22,16 @@ function SecureSendApp() {
   const [collapsed, setCollapsed] = useState(false);
   const [composeOpen, setComposeOpen] = useState(false);
   const [query, setQuery] = useState("");
+
+  // Auto-collapse sidebar on small screens.
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 768px)");
+    const apply = () => setCollapsed(mq.matches);
+    apply();
+    mq.addEventListener("change", apply);
+    return () => mq.removeEventListener("change", apply);
+  }, []);
+
   const [share, setShare] = useState<{
     open: boolean;
     link: string;
@@ -107,7 +118,12 @@ function SecureSendApp() {
           </div>
         ) : (
           <>
-            <div className="hidden w-[400px] shrink-0 border-r border-border md:block">
+            <div
+              className={
+                "shrink-0 border-r border-border md:w-[400px] md:block " +
+                (selectedId ? "hidden md:block" : "block w-full")
+              }
+            >
               <MessageList
                 folder={folder}
                 messages={filtered}
@@ -117,25 +133,28 @@ function SecureSendApp() {
                 onQuery={setQuery}
               />
             </div>
-            <div className="flex-1 overflow-hidden md:block">
-              {selected || !filtered.length ? (
-                <MessageDetail
-                  message={selected}
-                  onDelete={handleDelete}
-                  onMarkViewed={handleMarkViewed}
-                />
-              ) : (
-                <div className="md:hidden">
-                  <MessageList
-                    folder={folder}
-                    messages={filtered}
-                    selectedId={selectedId}
-                    onSelect={setSelectedId}
-                    query={query}
-                    onQuery={setQuery}
+            <div
+              className={
+                "flex-1 overflow-hidden " + (selectedId ? "block" : "hidden md:block")
+              }
+            >
+              <div className="flex h-full flex-col">
+                {selectedId && (
+                  <button
+                    onClick={() => setSelectedId(null)}
+                    className="flex items-center gap-2 border-b border-border px-4 py-2 text-sm text-muted-foreground hover:bg-secondary md:hidden"
+                  >
+                    <ArrowLeft className="h-4 w-4" /> Back to inbox
+                  </button>
+                )}
+                <div className="flex-1 overflow-hidden">
+                  <MessageDetail
+                    message={selected}
+                    onDelete={handleDelete}
+                    onMarkViewed={handleMarkViewed}
                   />
                 </div>
-              )}
+              </div>
             </div>
           </>
         )}
@@ -150,7 +169,7 @@ function SecureSendApp() {
           const newMsg: SecureMessage = {
             id: `new-${Date.now()}`,
             folder: "sent",
-            sender: "You → recipient",
+            sender: p.sendMode === "direct" && p.recipient ? `You → ${p.recipient}` : "You → recipient",
             preview: p.type === "text" ? p.content.slice(0, 60) : p.content,
             content: p.content,
             type: p.type,
@@ -165,16 +184,18 @@ function SecureSendApp() {
           };
           setMessages((m) => [newMsg, ...m]);
           setComposeOpen(false);
-          setShare({
-            open: true,
-            link: p.link,
-            summary: {
-              protection:
-                p.protection === "password" ? "Password" : p.protection === "key" ? "Secret key" : "Quick",
-              expiry: expiryLabel,
-              viewOnce: p.viewOnce,
-            },
-          });
+          if (p.sendMode === "link") {
+            setShare({
+              open: true,
+              link: p.link,
+              summary: {
+                protection:
+                  p.protection === "password" ? "Password" : p.protection === "key" ? "Secret key" : "Quick",
+                expiry: expiryLabel,
+                viewOnce: p.viewOnce,
+              },
+            });
+          }
         }}
       />
 
