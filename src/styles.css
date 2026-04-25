@@ -53,8 +53,14 @@
   --color-success-foreground: var(--success-foreground);
   --color-warning: var(--warning);
   --color-warning-foreground: var(--warning-foreground);
+  --color-key: var(--key);
+  --color-key-foreground: var(--key-foreground);
+  --color-key-soft: var(--key-soft);
+  --color-success-soft: var(--success-soft);
+  --color-warning-soft: var(--warning-soft);
   --shadow-elegant: var(--shadow-elegant);
   --shadow-floating: var(--shadow-floating);
+  --shadow-glow-primary: var(--shadow-glow-primary);
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);
@@ -94,8 +100,14 @@
   --accent-foreground: oklch(0.35 0.12 256);
   --success: oklch(0.65 0.16 150);
   --success-foreground: oklch(1 0 0);
+  --success-soft: oklch(0.94 0.05 150);
   --warning: oklch(0.78 0.15 80);
   --warning-foreground: oklch(0.25 0.05 80);
+  --warning-soft: oklch(0.96 0.06 80);
+  /* Key / secret-key purple */
+  --key: oklch(0.55 0.22 295);
+  --key-foreground: oklch(1 0 0);
+  --key-soft: oklch(0.95 0.04 295);
   --destructive: oklch(0.6 0.22 27);
   --destructive-foreground: oklch(1 0 0);
   --border: oklch(0.91 0.008 250);
@@ -103,6 +115,7 @@
   --ring: oklch(0.585 0.176 256);
   --shadow-elegant: 0 1px 2px 0 oklch(0.22 0.02 260 / 0.06), 0 1px 3px 0 oklch(0.22 0.02 260 / 0.1);
   --shadow-floating: 0 10px 30px -8px oklch(0.22 0.02 260 / 0.18);
+  --shadow-glow-primary: 0 0 0 6px oklch(0.585 0.176 256 / 0.12), 0 0 32px -4px oklch(0.585 0.176 256 / 0.45);
   --gradient-primary: linear-gradient(135deg, oklch(0.585 0.176 256), oklch(0.65 0.18 240));
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
