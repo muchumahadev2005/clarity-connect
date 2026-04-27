@@ -35,6 +35,7 @@ interface AnonEmail {
   body: string;
   sender: string;
   time: string;
+  unread?: boolean;
 }
 
 const ALIAS = "x7k2@yourapp.com";
@@ -47,6 +48,7 @@ const initialInbox: AnonEmail[] = [
     body: "I really appreciate you reaching out — this means a lot. I had no idea the team was feeling this way, and I'd like to set up a chat to talk through it. No pressure, only if you're comfortable.",
     sender: "Anonymous Sender",
     time: "2h ago",
+    unread: true,
   },
   {
     id: "a2",
@@ -55,6 +57,7 @@ const initialInbox: AnonEmail[] = [
     body: "Heads up — the numbers shared in the meeting do not match what's in the actual ledger. You may want to double-check Q3 entries before signing off. Staying anonymous to keep things neutral.",
     sender: "Anonymous Sender",
     time: "Yesterday",
+    unread: true,
   },
   {
     id: "a3",
@@ -63,12 +66,13 @@ const initialInbox: AnonEmail[] = [
     body: "Your talk last week genuinely changed how I think about my career. I didn't want to make it weird in person, so sending this anonymously. Keep doing what you're doing.",
     sender: "Anonymous Sender",
     time: "3d ago",
+    unread: false,
   },
 ];
 
 function AnonymousMail() {
   const [view, setView] = useState<View>("dashboard");
-  const [inbox] = useState<AnonEmail[]>(initialInbox);
+  const [inbox, setInbox] = useState<AnonEmail[]>(initialInbox);
   const [openEmail, setOpenEmail] = useState<AnonEmail | null>(null);
 
   const [to, setTo] = useState("");
@@ -142,6 +146,9 @@ function AnonymousMail() {
             emails={inbox}
             onOpen={(e) => {
               setOpenEmail(e);
+              setInbox((prev) =>
+                prev.map((m) => (m.id === e.id ? { ...m, unread: false } : m)),
+              );
               setView("read");
             }}
             onBack={() => setView("dashboard")}
