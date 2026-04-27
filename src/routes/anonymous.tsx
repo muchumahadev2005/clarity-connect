@@ -186,7 +186,7 @@ function Dashboard({
         </div>
         <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-anon to-[oklch(0.65_0.2_280)] text-anon-foreground">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-anon to-[oklch(0.65_0.18_240)] text-anon-foreground">
               <Mail className="h-5 w-5" />
             </div>
             <span className="font-mono text-lg font-semibold">{ALIAS}</span>
@@ -419,7 +419,7 @@ function ReadEmail({ email, onBack }: { email: AnonEmail; onBack: () => void }) 
 
       <article className="rounded-2xl border border-border bg-surface p-6 shadow-elegant">
         <div className="flex items-center gap-3 border-b border-border pb-4">
-          <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-anon to-[oklch(0.65_0.2_280)] text-anon-foreground">
+          <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-anon to-[oklch(0.65_0.18_240)] text-anon-foreground">
             <VenetianMask className="h-5 w-5" />
           </div>
           <div>

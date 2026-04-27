@@ -118,10 +118,10 @@
   --key: oklch(0.55 0.22 295);
   --key-foreground: oklch(1 0 0);
   --key-soft: oklch(0.95 0.04 295);
-  /* Anonymous accent: soft purple */
-  --anon: oklch(0.55 0.2 305);
+  /* Anonymous accent: aligned with primary blue/white theme */
+  --anon: oklch(0.585 0.176 256);
   --anon-foreground: oklch(1 0 0);
-  --anon-soft: oklch(0.96 0.04 305);
+  --anon-soft: oklch(0.94 0.04 256);
   --destructive: oklch(0.6 0.22 27);
   --destructive-foreground: oklch(1 0 0);
   --border: oklch(0.91 0.008 250);
