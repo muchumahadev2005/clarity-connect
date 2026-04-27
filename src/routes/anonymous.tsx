@@ -368,6 +368,20 @@ function InboxView({
   onOpen: (e: AnonEmail) => void;
   onBack: () => void;
 }) {
+  const [filter, setFilter] = useState<"all" | "unread" | "read">("all");
+  const counts = {
+    all: emails.length,
+    unread: emails.filter((e) => e.unread).length,
+    read: emails.filter((e) => !e.unread).length,
+  };
+  const visible = emails.filter((e) =>
+    filter === "all" ? true : filter === "unread" ? e.unread : !e.unread,
+  );
+  const filters: { key: "all" | "unread" | "read"; label: string }[] = [
+    { key: "all", label: "All" },
+    { key: "unread", label: "Unread" },
+    { key: "read", label: "Read" },
+  ];
   return (
     <div className="space-y-5">
       <button
@@ -384,13 +398,50 @@ function InboxView({
         </p>
       </div>
 
+      <div className="flex flex-wrap items-center gap-2">
+        {filters.map((f) => {
+          const active = filter === f.key;
+          return (
+            <button
+              key={f.key}
+              onClick={() => setFilter(f.key)}
+              className={cn(
+                "inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-xs font-medium transition-colors ring-1",
+                active
+                  ? "bg-anon text-anon-foreground ring-anon"
+                  : "bg-surface text-muted-foreground ring-border hover:text-foreground hover:bg-surface-muted",
+              )}
+            >
+              {f.label}
+              <span
+                className={cn(
+                  "rounded-full px-1.5 py-0.5 text-[10px] font-semibold",
+                  active
+                    ? "bg-anon-foreground/20 text-anon-foreground"
+                    : "bg-surface-muted text-muted-foreground",
+                )}
+              >
+                {counts[f.key]}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      {visible.length === 0 && (
+        <div className="rounded-2xl border border-dashed border-border bg-surface p-8 text-center text-sm text-muted-foreground">
+          No {filter === "all" ? "" : filter} messages here.
+        </div>
+      )}
+
       <ul className="space-y-3">
-        {emails.map((e) => (
+        {visible.map((e) => (
           <li key={e.id}>
             <button
               onClick={() => onOpen(e)}
               className={cn(
                 "group flex w-full gap-4 rounded-2xl border border-border bg-surface p-4 text-left shadow-elegant hover:border-anon/40 hover:shadow-floating transition-all",
+                e.unread && "border-anon/30 bg-anon-soft/30",
               )}
             >
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-anon-soft text-anon ring-1 ring-anon/20">
@@ -398,7 +449,12 @@ function InboxView({
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="truncate font-medium">{e.subject}</span>
+                  <span className={cn("truncate", e.unread ? "font-semibold" : "font-medium")}>
+                    {e.unread && (
+                      <span className="mr-2 inline-block h-2 w-2 rounded-full bg-anon align-middle" />
+                    )}
+                    {e.subject}
+                  </span>
                   <span className="shrink-0 text-[11px] text-muted-foreground">{e.time}</span>
                 </div>
                 <p className="mt-0.5 truncate text-sm text-muted-foreground">{e.preview}</p>
