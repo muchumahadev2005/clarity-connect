@@ -61,6 +61,9 @@
   --color-flash: var(--flash);
   --color-flash-foreground: var(--flash-foreground);
   --color-flash-soft: var(--flash-soft);
+  --color-anon: var(--anon);
+  --color-anon-foreground: var(--anon-foreground);
+  --color-anon-soft: var(--anon-soft);
   --shadow-elegant: var(--shadow-elegant);
   --shadow-floating: var(--shadow-floating);
   --shadow-glow-primary: var(--shadow-glow-primary);
