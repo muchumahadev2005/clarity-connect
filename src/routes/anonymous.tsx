@@ -10,6 +10,7 @@ import {
   ShieldCheck,
   Mail,
   Sparkles,
+  RefreshCw,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -38,7 +39,12 @@ interface AnonEmail {
   unread?: boolean;
 }
 
-const ALIAS = "x7k2@yourapp.com";
+function generateAlias() {
+  const chars = "abcdefghijkmnopqrstuvwxyz23456789";
+  let s = "";
+  for (let i = 0; i < 5; i++) s += chars[Math.floor(Math.random() * chars.length)];
+  return `${s}@yourapp.com`;
+}
 
 const initialInbox: AnonEmail[] = [
   {
@@ -74,14 +80,27 @@ function AnonymousMail() {
   const [view, setView] = useState<View>("dashboard");
   const [inbox, setInbox] = useState<AnonEmail[]>(initialInbox);
   const [openEmail, setOpenEmail] = useState<AnonEmail | null>(null);
+  const [alias, setAlias] = useState<string>(() => generateAlias());
+  const [aliasPulse, setAliasPulse] = useState(false);
 
   const [to, setTo] = useState("");
   const [subject, setSubject] = useState("");
   const [message, setMessage] = useState("");
 
   const copyAlias = async () => {
-    await navigator.clipboard.writeText(ALIAS);
+    await navigator.clipboard.writeText(alias);
     toast.success("Alias copied to clipboard");
+  };
+
+  const regenerateAlias = () => {
+    let next = generateAlias();
+    if (next === alias) next = generateAlias();
+    setAlias(next);
+    setAliasPulse(true);
+    window.setTimeout(() => setAliasPulse(false), 900);
+    toast.success("New alias generated", {
+      description: next,
+    });
   };
 
   const sendAnon = () => {
@@ -124,12 +143,16 @@ function AnonymousMail() {
             onCompose={() => setView("compose")}
             onInbox={() => setView("inbox")}
             onCopy={copyAlias}
+            onRegenerate={regenerateAlias}
+            alias={alias}
+            pulse={aliasPulse}
             inboxCount={inbox.length}
           />
         )}
 
         {view === "compose" && (
           <Compose
+            alias={alias}
             to={to}
             subject={subject}
             message={message}
@@ -143,6 +166,7 @@ function AnonymousMail() {
 
         {view === "inbox" && (
           <InboxView
+            alias={alias}
             emails={inbox}
             onOpen={(e) => {
               setOpenEmail(e);
@@ -167,11 +191,17 @@ function Dashboard({
   onCompose,
   onInbox,
   onCopy,
+  onRegenerate,
+  alias,
+  pulse,
   inboxCount,
 }: {
   onCompose: () => void;
   onInbox: () => void;
   onCopy: () => void;
+  onRegenerate: () => void;
+  alias: string;
+  pulse: boolean;
   inboxCount: number;
 }) {
   return (
@@ -187,27 +217,54 @@ function Dashboard({
       </div>
 
       {/* Alias card */}
-      <div className="rounded-2xl border border-border bg-surface p-6 shadow-elegant">
-        <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          Your alias address
+      <div
+        className={cn(
+          "rounded-2xl border bg-surface p-6 shadow-elegant transition-all duration-500",
+          pulse
+            ? "border-anon/60 ring-2 ring-anon/30 shadow-floating"
+            : "border-border",
+        )}
+      >
+        <div className="flex items-center justify-between">
+          <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Your alias address
+          </div>
+          <span className="inline-flex items-center gap-1 rounded-full bg-anon-soft px-2 py-0.5 text-[10px] font-semibold text-anon ring-1 ring-anon/20">
+            <span className="h-1.5 w-1.5 rounded-full bg-anon animate-pulse" />
+            Active Alias
+          </span>
         </div>
-        <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-anon to-[oklch(0.65_0.18_240)] text-anon-foreground">
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-anon to-[oklch(0.65_0.18_240)] text-anon-foreground">
               <Mail className="h-5 w-5" />
             </div>
-            <span className="font-mono text-lg font-semibold">{ALIAS}</span>
+            <span
+              key={alias}
+              className="truncate font-mono text-lg font-semibold animate-fade-in"
+            >
+              {alias}
+            </span>
           </div>
-          <button
-            onClick={onCopy}
-            className="inline-flex items-center gap-2 rounded-full bg-anon-soft px-4 py-2 text-sm font-medium text-anon ring-1 ring-anon/20 hover:bg-anon hover:text-anon-foreground transition-colors"
-          >
-            <Copy className="h-4 w-4" /> Copy Alias
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={onCopy}
+              className="inline-flex items-center gap-2 rounded-full bg-anon-soft px-3.5 py-2 text-sm font-medium text-anon ring-1 ring-anon/20 hover:bg-anon hover:text-anon-foreground transition-colors"
+            >
+              <Copy className="h-4 w-4" /> Copy
+            </button>
+            <button
+              onClick={onRegenerate}
+              className="inline-flex items-center gap-2 rounded-full bg-anon px-3.5 py-2 text-sm font-medium text-anon-foreground ring-1 ring-anon hover:opacity-90 transition-all"
+            >
+              <RefreshCw className={cn("h-4 w-4", pulse && "animate-spin")} />
+              Regenerate
+            </button>
+          </div>
         </div>
         <div className="mt-4 flex items-center gap-2 text-xs text-muted-foreground">
           <ShieldCheck className="h-3.5 w-3.5 text-success" />
-          Rotates automatically every 30 days
+          🔐 Your alias hides your real email. You can regenerate it anytime.
         </div>
       </div>
 
@@ -262,6 +319,7 @@ function Dashboard({
 }
 
 function Compose({
+  alias,
   to,
   subject,
   message,
@@ -271,6 +329,7 @@ function Compose({
   onSend,
   onBack,
 }: {
+  alias: string;
   to: string;
   subject: string;
   message: string;
@@ -296,7 +355,7 @@ function Compose({
           </div>
           <div>
             <h2 className="text-lg font-semibold">New anonymous email</h2>
-            <p className="text-xs text-muted-foreground">From: {ALIAS}</p>
+            <p className="text-xs text-muted-foreground">From: {alias}</p>
           </div>
         </div>
 
@@ -360,10 +419,12 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 function InboxView({
+  alias,
   emails,
   onOpen,
   onBack,
 }: {
+  alias: string;
   emails: AnonEmail[];
   onOpen: (e: AnonEmail) => void;
   onBack: () => void;
@@ -394,7 +455,7 @@ function InboxView({
       <div>
         <h2 className="text-2xl font-semibold tracking-tight">Anonymous Inbox</h2>
         <p className="text-sm text-muted-foreground">
-          Messages sent to <span className="font-mono">{ALIAS}</span>
+          Messages sent to <span className="font-mono">{alias}</span>
         </p>
       </div>
 
