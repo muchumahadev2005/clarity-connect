@@ -180,7 +180,7 @@ function AnonymousMail() {
         )}
 
         {view === "read" && openEmail && (
-          <ReadEmail email={openEmail} onBack={() => setView("inbox")} />
+          <ReadEmail alias={alias} email={openEmail} onBack={() => setView("inbox")} />
         )}
       </main>
     </div>
