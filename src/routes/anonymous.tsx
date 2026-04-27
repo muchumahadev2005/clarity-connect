@@ -531,7 +531,15 @@ function InboxView({
   );
 }
 
-function ReadEmail({ email, onBack }: { email: AnonEmail; onBack: () => void }) {
+function ReadEmail({
+  alias,
+  email,
+  onBack,
+}: {
+  alias: string;
+  email: AnonEmail;
+  onBack: () => void;
+}) {
   return (
     <div className="space-y-5 animate-fade-in">
       <button
@@ -549,7 +557,7 @@ function ReadEmail({ email, onBack }: { email: AnonEmail; onBack: () => void }) 
           <div>
             <div className="font-semibold">Anonymous Sender 🎭</div>
             <div className="text-xs text-muted-foreground">
-              to {ALIAS} · {email.time}
+              to {alias} · {email.time}
             </div>
           </div>
         </div>
