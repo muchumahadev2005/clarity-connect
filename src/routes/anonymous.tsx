@@ -43,7 +43,7 @@ function generateAlias() {
   const chars = "abcdefghijkmnopqrstuvwxyz23456789";
   let s = "";
   for (let i = 0; i < 5; i++) s += chars[Math.floor(Math.random() * chars.length)];
-  return `${s}@yourapp.com`;
+  return `${s}@securesend.co.in`;
 }
 
 const initialInbox: AnonEmail[] = [
@@ -213,6 +213,9 @@ function Dashboard({
         <h1 className="text-3xl font-semibold tracking-tight">Anonymous Mail 🎭</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           Send and receive email through a disposable alias. No one sees who you really are.
+        </p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          All emails are sent using secure aliases under securesend.co.in
         </p>
       </div>
 
@@ -556,6 +559,7 @@ function ReadEmail({
           </div>
           <div>
             <div className="font-semibold">Anonymous Sender 🎭</div>
+            <div className="text-xs text-muted-foreground">via securesend.co.in</div>
             <div className="text-xs text-muted-foreground">
               to {alias} · {email.time}
             </div>
