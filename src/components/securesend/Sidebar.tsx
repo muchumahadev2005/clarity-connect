@@ -1,4 +1,5 @@
-import { Inbox, Send, TimerOff, Activity, ShieldCheck, Plus, Menu } from "lucide-react";
+import { Inbox, Send, TimerOff, Activity, ShieldCheck, Plus, Menu, VenetianMask } from "lucide-react";
+import { Link } from "@tanstack/react-router";
 import type { Folder } from "./types";
 import { cn } from "@/lib/utils";
 
@@ -98,6 +99,19 @@ export function Sidebar({ active, onSelect, onCompose, counts, collapsed, onTogg
           </p>
         </div>
       )}
+
+      <div className={cn("border-t border-border px-2 py-2", collapsed && "px-1")}>
+        <Link
+          to="/anonymous"
+          className={cn(
+            "flex items-center gap-4 rounded-r-full pl-6 pr-4 py-2 text-sm transition-colors text-foreground/80 hover:bg-anon-soft hover:text-anon",
+            collapsed && "justify-center pl-0 pr-0 py-3 rounded-full mx-auto w-12",
+          )}
+        >
+          <VenetianMask className="h-5 w-5 shrink-0 text-anon" />
+          {!collapsed && <span className="flex-1 text-left">Anonymous 🎭</span>}
+        </Link>
+      </div>
     </aside>
   );
 }
