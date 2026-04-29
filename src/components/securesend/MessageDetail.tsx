@@ -364,10 +364,12 @@ function UnlockedBody({
   message,
   revealed,
   setRevealed,
+  decryptedBody,
 }: {
   message: SecureMessage;
   revealed: boolean;
   setRevealed: (v: boolean) => void;
+  decryptedBody?: string | null;
 }) {
   if (message.stealth && !revealed) {
     return (
@@ -406,7 +408,7 @@ function UnlockedBody({
         </div>
       )}
       <p className="whitespace-pre-wrap text-[15px] leading-relaxed text-foreground">
-        {message.content}
+        {decryptedBody ?? message.content}
       </p>
       {message.viewOnce && (
         <div className="flex items-start gap-2 rounded-xl border border-warning/40 bg-warning-soft px-4 py-3 text-xs text-warning-foreground">
