@@ -181,6 +181,7 @@ function SecureSendApp() {
             timestamp: new Date().toISOString(),
             views: 0,
             logs: [],
+            encrypted: p.encrypted,
           };
           setMessages((m) => [newMsg, ...m]);
           setComposeOpen(false);

@@ -22,6 +22,7 @@ import { VoicePlayer } from "./VoicePlayer";
 import { CircularTimer } from "./CircularTimer";
 import { toast } from "sonner";
 import { HybridSteps } from "./HybridSteps";
+import { hybridDecrypt, getOwnPrivateKey } from "./crypto";
 
 interface Props {
   message: SecureMessage | null;
@@ -47,6 +48,7 @@ export function MessageDetail({ message, onDelete, onMarkViewed }: Props) {
   const [revealed, setRevealed] = useState(false);
   const [decrypting, setDecrypting] = useState(false);
   const [decryptStep, setDecryptStep] = useState(0);
+  const [decryptedBody, setDecryptedBody] = useState<string | null>(null);
   const now = useStableNow(!!message);
 
   useEffect(() => {
@@ -56,6 +58,7 @@ export function MessageDetail({ message, onDelete, onMarkViewed }: Props) {
     setRevealed(false);
     setDecrypting(false);
     setDecryptStep(0);
+    setDecryptedBody(null);
   }, [message?.id]);
 
   if (!message) {
@@ -79,25 +82,56 @@ export function MessageDetail({ message, onDelete, onMarkViewed }: Props) {
   const remainingMs = now == null ? expiresAtMs - createdAtMs : expiresAtMs - now;
   const isExpired = (now != null && remainingMs <= 0) || message.status === "expired";
 
-  const handleUnlock = () => {
+  const handleUnlock = async () => {
     if (decrypting) return;
     setDecrypting(true);
     setDecryptStep(1);
-    setTimeout(() => setDecryptStep(2), 350);
-    setTimeout(() => setDecryptStep(3), 700);
-    setTimeout(() => {
-      if (message.password && pwd !== message.password) {
-        toast.error("Unable to decrypt message. Invalid key or access.");
-        setDecrypting(false);
-        setDecryptStep(0);
-        return;
+    try {
+      // If we have a real hybrid payload, decrypt it with Web Crypto.
+      if (message.encrypted) {
+        await new Promise((r) => setTimeout(r, 250));
+        setDecryptStep(2);
+        const privateKey = await getOwnPrivateKey();
+        // RSA-OAEP unwraps the AES key, then AES-GCM decrypts the body.
+        const plaintext = await hybridDecrypt(message.encrypted, privateKey);
+        setDecryptStep(3);
+        let body = plaintext;
+        let requiredPwd: string | null = null;
+        try {
+          const env = JSON.parse(plaintext);
+          if (env && typeof env === "object" && "body" in env) {
+            body = String(env.body);
+            requiredPwd = env.password ?? null;
+          }
+        } catch {
+          /* not an envelope, treat plaintext as body */
+        }
+        if (requiredPwd && pwd !== requiredPwd) {
+          throw new Error("Invalid key or corrupted data");
+        }
+        setDecryptedBody(body);
+      } else {
+        // Legacy / mock messages: simulate steps and check password locally.
+        await new Promise((r) => setTimeout(r, 350));
+        setDecryptStep(2);
+        await new Promise((r) => setTimeout(r, 350));
+        setDecryptStep(3);
+        if (message.password && pwd !== message.password) {
+          throw new Error("Invalid key or corrupted data");
+        }
+        await new Promise((r) => setTimeout(r, 250));
       }
       setDecryptStep(4);
       setUnlocked(true);
       onMarkViewed(message.id);
       toast.success("Message decrypted securely");
+    } catch (err) {
+      console.error("Hybrid decryption failed", err);
+      toast.error("Invalid key or corrupted data");
+      setDecryptStep(0);
+    } finally {
       setDecrypting(false);
-    }, 1050);
+    }
   };
 
   return (
@@ -182,7 +216,12 @@ export function MessageDetail({ message, onDelete, onMarkViewed }: Props) {
             <div className="mb-4 inline-flex items-center gap-1.5 rounded-full bg-success-soft px-3 py-1 text-[11px] font-medium text-success ring-1 ring-success/20 animate-fade-in">
               <ShieldCheck className="h-3.5 w-3.5" /> Decrypted securely · Hybrid AES + RSA
             </div>
-            <UnlockedBody message={message} revealed={revealed} setRevealed={setRevealed} />
+            <UnlockedBody
+              message={message}
+              revealed={revealed}
+              setRevealed={setRevealed}
+              decryptedBody={decryptedBody}
+            />
           </>
         )}
       </div>
@@ -325,10 +364,12 @@ function UnlockedBody({
   message,
   revealed,
   setRevealed,
+  decryptedBody,
 }: {
   message: SecureMessage;
   revealed: boolean;
   setRevealed: (v: boolean) => void;
+  decryptedBody?: string | null;
 }) {
   if (message.stealth && !revealed) {
     return (
@@ -367,7 +408,7 @@ function UnlockedBody({
         </div>
       )}
       <p className="whitespace-pre-wrap text-[15px] leading-relaxed text-foreground">
-        {message.content}
+        {decryptedBody ?? message.content}
       </p>
       {message.viewOnce && (
         <div className="flex items-start gap-2 rounded-xl border border-warning/40 bg-warning-soft px-4 py-3 text-xs text-warning-foreground">

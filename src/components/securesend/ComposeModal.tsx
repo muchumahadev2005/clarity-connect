@@ -23,6 +23,9 @@ import type { MessageType, ProtectionMode } from "./types";
 import { cn } from "@/lib/utils";
 import { UserSearch } from "./UserSearch";
 import { HybridSteps } from "./HybridSteps";
+import { hybridEncrypt, getRecipientPublicKey } from "./crypto";
+import type { EncryptedPayload } from "./types";
+import { toast } from "sonner";
 
 function generateSecretKey() {
   const hex = () =>
@@ -46,6 +49,7 @@ interface Props {
     link: string;
     sendMode: "link" | "direct";
     recipient: string | null;
+    encrypted: EncryptedPayload;
   }) => void;
 }
 
@@ -127,20 +131,50 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
     setEncStep(0);
   };
 
-  const submit = () => {
+  const submit = async () => {
     const content =
       tab === "text" ? text : tab === "voice" ? "Voice note · 0:24" : fileName ?? "attachment.bin";
     if (!content.trim()) return;
     const link = `https://securesend.app/m/${Math.random().toString(36).slice(2, 10)}`;
-    // Animate hybrid encryption steps before completing
-    setEncStep(1);
-    setTimeout(() => setEncStep(2), 450);
-    setTimeout(() => setEncStep(3), 900);
-    setTimeout(() => setEncStep(4), 1350);
-    setTimeout(() => {
-      onEncrypt({ type: tab, content, protection, password, expiry, viewOnce, link, sendMode, recipient });
+    try {
+      // Real hybrid encryption with Web Crypto API.
+      // Step 1: generate AES key (inside hybridEncrypt)
+      setEncStep(1);
+      const publicKey = await getRecipientPublicKey();
+      // Step 2: encrypt message with AES-GCM
+      setEncStep(2);
+      // Bind the password/secret-key (if any) to the plaintext envelope so the
+      // recipient must supply it to access the decoded payload. The transport
+      // ciphertext itself is always AES+RSA.
+      const envelope = JSON.stringify({
+        v: 1,
+        protection,
+        password: password || null,
+        body: content,
+      });
+      const encrypted = await hybridEncrypt(envelope, publicKey);
+      // Step 3: AES key wrapped with RSA (done inside hybridEncrypt)
+      setEncStep(3);
+      await new Promise((r) => setTimeout(r, 250));
+      setEncStep(4);
+      onEncrypt({
+        type: tab,
+        content,
+        protection,
+        password,
+        expiry,
+        viewOnce,
+        link,
+        sendMode,
+        recipient,
+        encrypted,
+      });
       reset();
-    }, 1650);
+    } catch (err) {
+      console.error("Hybrid encryption failed", err);
+      toast.error("Encryption failed. Please try again.");
+      setEncStep(0);
+    }
   };
 
   return (
