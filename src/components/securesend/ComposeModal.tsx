@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   X,
   Type,
@@ -14,14 +14,24 @@ import {
   Circle,
   Link2,
   Send,
-  Zap,
-  AlertTriangle,
   Info,
+  RefreshCw,
+  Copy,
+  Check,
 } from "lucide-react";
 import type { MessageType, ProtectionMode } from "./types";
 import { cn } from "@/lib/utils";
 import { UserSearch } from "./UserSearch";
 import { HybridSteps } from "./HybridSteps";
+
+function generateSecretKey() {
+  const hex = () =>
+    Math.floor(Math.random() * 0xffff)
+      .toString(16)
+      .toUpperCase()
+      .padStart(4, "0");
+  return `SK-${hex()}-${hex()}`;
+}
 
 interface Props {
   open: boolean;
@@ -59,6 +69,47 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
   const [sendMode, setSendMode] = useState<"link" | "direct">("link");
   const [recipient, setRecipient] = useState<string | null>(null);
   const [encStep, setEncStep] = useState(0); // 0 idle, 1-3 steps, 4 done
+  const [keyCopied, setKeyCopied] = useState(false);
+  const [keyPulse, setKeyPulse] = useState(false);
+  const keyInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Auto-generate a secret key when "key" mode is selected and field is empty.
+  useEffect(() => {
+    if (protection === "key" && !password) {
+      setPassword(generateSecretKey());
+      setKeyPulse(true);
+      setTimeout(() => setKeyPulse(false), 700);
+      setTimeout(() => keyInputRef.current?.focus(), 50);
+    }
+    // Clear password when leaving protected modes
+    if (protection === "quick") setPassword("");
+  }, [protection]);
+
+  const regenerateKey = () => {
+    setPassword(generateSecretKey());
+    setKeyPulse(true);
+    setTimeout(() => setKeyPulse(false), 700);
+    keyInputRef.current?.focus();
+  };
+
+  const copyKey = async () => {
+    try {
+      await navigator.clipboard.writeText(password);
+      setKeyCopied(true);
+      setTimeout(() => setKeyCopied(false), 1600);
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const keyError =
+    protection === "key"
+      ? !password
+        ? "Key is required"
+        : password.length < 6
+          ? "Use a stronger key"
+          : null
+      : null;
 
   if (!open) return null;
 
@@ -218,13 +269,12 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
             <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               Protection
             </p>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <div className="grid grid-cols-3 gap-2">
               {(
                 [
                   { id: "quick", label: "Quick", icon: Sparkles },
                   { id: "password", label: "Password", icon: Lock },
                   { id: "key", label: "Secret Key", icon: KeyRound },
-                  { id: "firstAccess", label: "First Access", icon: Zap },
                 ] as const
               ).map((p) => (
                 <button
@@ -233,9 +283,7 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
                   className={cn(
                     "flex flex-col items-center gap-1 rounded-xl border px-3 py-3 text-xs transition",
                     protection === p.id
-                      ? p.id === "firstAccess"
-                        ? "border-flash bg-flash-soft text-flash-foreground font-medium"
-                        : "border-primary bg-primary-soft text-accent-foreground font-medium"
+                      ? "border-primary bg-primary-soft text-accent-foreground font-medium"
                       : "border-border hover:bg-secondary",
                   )}
                 >
@@ -244,22 +292,74 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
                 </button>
               ))}
             </div>
-            {(protection === "password" || protection === "key") && (
+            {protection === "password" && (
               <input
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder={protection === "key" ? "Generate or paste a key…" : "Set a password"}
+                placeholder="Set a password"
                 className="mt-2 w-full rounded-xl border border-border bg-surface px-3 py-2 text-sm font-mono outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
               />
             )}
-            {protection === "firstAccess" && (
-              <div className="mt-2 flex items-start gap-2 rounded-xl border border-flash/40 bg-flash-soft px-3 py-2.5 text-xs text-flash-foreground animate-fade-in">
-                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-flash" />
-                <p>
-                  <span className="font-semibold">⚡ One-time view.</span> This message will
-                  automatically unlock for the first viewer only. After it is opened once, it
-                  cannot be viewed again.
-                </p>
+            {protection === "key" && (
+              <div className="mt-3 space-y-2 animate-fade-in">
+                <div className="inline-flex items-center gap-1.5 rounded-full bg-key-soft px-2.5 py-1 text-[11px] font-medium text-key ring-1 ring-key/20">
+                  <ShieldCheck className="h-3 w-3" /> Secure Key Mode Enabled
+                </div>
+                <div
+                  className={cn(
+                    "flex items-stretch gap-2 rounded-xl border bg-surface p-1.5 transition-all",
+                    keyPulse
+                      ? "border-key shadow-[0_0_0_4px_oklch(var(--key)/0.15)]"
+                      : "border-border focus-within:border-key focus-within:shadow-[0_0_0_4px_oklch(var(--key)/0.12)]",
+                  )}
+                >
+                  <div className="flex items-center pl-2 text-key">
+                    <KeyRound className="h-4 w-4" />
+                  </div>
+                  <input
+                    ref={keyInputRef}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="SK-XXXX-XXXX"
+                    spellCheck={false}
+                    className="min-w-0 flex-1 rounded-lg bg-transparent px-2 py-2 text-sm font-mono tracking-wider outline-none placeholder:text-muted-foreground/60"
+                  />
+                  <button
+                    type="button"
+                    onClick={copyKey}
+                    title="Copy key"
+                    className="inline-flex items-center gap-1 rounded-lg px-2.5 text-xs font-medium text-foreground/70 transition hover:bg-secondary active:scale-95"
+                  >
+                    {keyCopied ? (
+                      <>
+                        <Check className="h-3.5 w-3.5 text-success" />
+                        <span className="text-success">Copied</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="h-3.5 w-3.5" />
+                        Copy
+                      </>
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={regenerateKey}
+                    title="Generate new key"
+                    className="inline-flex items-center gap-1 rounded-lg bg-key-soft px-2.5 text-xs font-medium text-key transition hover:opacity-90 active:scale-95"
+                  >
+                    <RefreshCw className={cn("h-3.5 w-3.5", keyPulse && "animate-spin")} />
+                    Generate
+                  </button>
+                </div>
+                {keyError ? (
+                  <p className="text-[11px] font-medium text-destructive">{keyError}</p>
+                ) : (
+                  <p className="text-[11px] text-muted-foreground">
+                    🔐 This key is required to decrypt the message. Share it separately with the
+                    recipient.
+                  </p>
+                )}
               </div>
             )}
           </div>
