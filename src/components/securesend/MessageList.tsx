@@ -38,12 +38,6 @@ function ProtectionBadge({ m }: { m: SecureMessage }) {
         <KeyRound className="h-3 w-3" /> Secret Key
       </span>
     );
-  if (m.protection === "firstAccess")
-    return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-flash-soft px-2 py-0.5 text-[11px] font-medium text-flash-foreground ring-1 ring-flash/30">
-        <Zap className="h-3 w-3 text-flash" /> First Access
-      </span>
-    );
   return (
     <span className="inline-flex items-center gap-1 rounded-full bg-success-soft px-2 py-0.5 text-[11px] font-medium text-success ring-1 ring-success/20">
       <Sparkles className="h-3 w-3" /> Quick
