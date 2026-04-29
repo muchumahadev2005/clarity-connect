@@ -155,6 +155,7 @@ export function MessageDetail({ message, onDelete, onMarkViewed }: Props) {
             label="End-to-End Encrypted"
             tone="success"
           />
+          <StatusChip icon={KeyRound} label="Hybrid: AES + RSA" tone="primary" />
           {message.protection === "password" && (
             <StatusChip icon={Lock} label="Password Protected" tone="primary" />
           )}
@@ -185,16 +186,29 @@ export function MessageDetail({ message, onDelete, onMarkViewed }: Props) {
         ) : message.protection === "firstAccess" && decrypting ? (
           <FirstAccessUnlocking />
         ) : !unlocked ? (
-          <LockScreen
-            mode={message.protection as "password" | "key" | "quick"}
-            value={pwd}
-            onChange={setPwd}
-            onUnlock={handleUnlock}
-            decrypting={decrypting}
-          />
+          <>
+            <LockScreen
+              mode={message.protection as "password" | "key" | "quick"}
+              value={pwd}
+              onChange={setPwd}
+              onUnlock={handleUnlock}
+              decrypting={decrypting}
+            />
+            {decrypting && (
+              <div className="mx-auto mt-6 max-w-md animate-fade-in">
+                <HybridSteps mode="decrypt" step={decryptStep} />
+                <p className="mt-2 text-center text-xs text-muted-foreground">
+                  Decrypting securely…
+                </p>
+              </div>
+            )}
+          </>
         ) : (
           <>
             {message.protection === "firstAccess" && <FirstAccessBanner />}
+            <div className="mb-4 inline-flex items-center gap-1.5 rounded-full bg-success-soft px-3 py-1 text-[11px] font-medium text-success ring-1 ring-success/20 animate-fade-in">
+              <ShieldCheck className="h-3.5 w-3.5" /> Decrypted securely · Hybrid AES + RSA
+            </div>
             <UnlockedBody message={message} revealed={revealed} setRevealed={setRevealed} />
           </>
         )}
