@@ -23,6 +23,7 @@ import { timeAgo } from "./utils";
 import { VoicePlayer } from "./VoicePlayer";
 import { CircularTimer } from "./CircularTimer";
 import { toast } from "sonner";
+import { HybridSteps } from "./HybridSteps";
 
 interface Props {
   message: SecureMessage | null;
@@ -47,6 +48,7 @@ export function MessageDetail({ message, onDelete, onMarkViewed }: Props) {
   const [pwd, setPwd] = useState("");
   const [revealed, setRevealed] = useState(false);
   const [decrypting, setDecrypting] = useState(false);
+  const [decryptStep, setDecryptStep] = useState(0);
   const now = useStableNow(!!message);
 
   useEffect(() => {
@@ -59,6 +61,7 @@ export function MessageDetail({ message, onDelete, onMarkViewed }: Props) {
     setRevealed(false);
     // Trigger the unlock animation for first-access messages.
     setDecrypting(message?.protection === "firstAccess" && !message?.accessed);
+    setDecryptStep(0);
   }, [message?.id]);
 
   // Auto-mark first-access messages as viewed after the unlock animation.
@@ -98,17 +101,22 @@ export function MessageDetail({ message, onDelete, onMarkViewed }: Props) {
   const handleUnlock = () => {
     if (decrypting) return;
     setDecrypting(true);
+    setDecryptStep(1);
+    setTimeout(() => setDecryptStep(2), 350);
+    setTimeout(() => setDecryptStep(3), 700);
     setTimeout(() => {
       if (message.password && pwd !== message.password) {
-        toast.error("Incorrect password or key.");
+        toast.error("Unable to decrypt message. Invalid key or access.");
         setDecrypting(false);
+        setDecryptStep(0);
         return;
       }
+      setDecryptStep(4);
       setUnlocked(true);
       onMarkViewed(message.id);
-      toast.success("Message decrypted");
+      toast.success("Message decrypted securely");
       setDecrypting(false);
-    }, 700);
+    }, 1050);
   };
 
   return (
