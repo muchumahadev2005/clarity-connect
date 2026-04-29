@@ -8,6 +8,15 @@ export interface AccessLog {
   device: string;
 }
 
+export interface EncryptedPayload {
+  /** base64 AES-GCM ciphertext */
+  encryptedData: string;
+  /** base64 RSA-OAEP wrapped AES key */
+  encryptedAESKey: string;
+  /** base64 12-byte IV */
+  iv: string;
+}
+
 export interface SecureMessage {
   id: string;
   folder: Exclude<Folder, "logs">;
@@ -24,4 +33,6 @@ export interface SecureMessage {
   views: number;
   logs: AccessLog[];
   stealth?: boolean;
+  /** Real hybrid (AES + RSA) ciphertext, when encrypted in-browser. */
+  encrypted?: EncryptedPayload;
 }
