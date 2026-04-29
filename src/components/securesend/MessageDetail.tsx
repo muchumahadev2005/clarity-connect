@@ -15,8 +15,6 @@ import {
   Loader2,
   Sparkles,
   Unlock,
-  Zap,
-  ArrowLeft,
 } from "lucide-react";
 import type { SecureMessage } from "./types";
 import { timeAgo } from "./utils";
@@ -52,28 +50,12 @@ export function MessageDetail({ message, onDelete, onMarkViewed }: Props) {
   const now = useStableNow(!!message);
 
   useEffect(() => {
-    // Quick messages auto-open. First-access messages auto-unlock on FIRST view only.
-    const autoUnlock =
-      message?.protection === "quick" ||
-      (message?.protection === "firstAccess" && !message?.accessed);
-    setUnlocked(!!autoUnlock);
+    // Quick messages auto-open.
+    setUnlocked(message?.protection === "quick");
     setPwd("");
     setRevealed(false);
-    // Trigger the unlock animation for first-access messages.
-    setDecrypting(message?.protection === "firstAccess" && !message?.accessed);
+    setDecrypting(false);
     setDecryptStep(0);
-  }, [message?.id]);
-
-  // Auto-mark first-access messages as viewed after the unlock animation.
-  useEffect(() => {
-    if (!message) return;
-    if (message.protection !== "firstAccess") return;
-    if (message.accessed) return;
-    const t = setTimeout(() => {
-      setDecrypting(false);
-      onMarkViewed(message.id);
-    }, 1100);
-    return () => clearTimeout(t);
   }, [message?.id]);
 
   if (!message) {
@@ -96,7 +78,6 @@ export function MessageDetail({ message, onDelete, onMarkViewed }: Props) {
   const totalMs = Math.max(1, expiresAtMs - createdAtMs);
   const remainingMs = now == null ? expiresAtMs - createdAtMs : expiresAtMs - now;
   const isExpired = (now != null && remainingMs <= 0) || message.status === "expired";
-  const firstAccessLocked = message.protection === "firstAccess" && !!message.accessed;
 
   const handleUnlock = () => {
     if (decrypting) return;
@@ -165,9 +146,6 @@ export function MessageDetail({ message, onDelete, onMarkViewed }: Props) {
           {message.protection === "quick" && (
             <StatusChip icon={Sparkles} label="Quick Encryption" tone="success" />
           )}
-          {message.protection === "firstAccess" && (
-            <StatusChip icon={Zap} label="First-Access Auto Unlock" tone="flash" />
-          )}
           {message.viewOnce && (
             <StatusChip icon={Eye} label="View Once" tone="warning" />
           )}
@@ -181,10 +159,6 @@ export function MessageDetail({ message, onDelete, onMarkViewed }: Props) {
       <div className="flex-1 overflow-y-auto scrollbar-thin px-6 py-6">
         {isExpired ? (
           <ExpiredState />
-        ) : firstAccessLocked ? (
-          <AlreadyAccessedState onBack={() => onDelete(message.id)} />
-        ) : message.protection === "firstAccess" && decrypting ? (
-          <FirstAccessUnlocking />
         ) : !unlocked ? (
           <>
             <LockScreen
@@ -205,7 +179,6 @@ export function MessageDetail({ message, onDelete, onMarkViewed }: Props) {
           </>
         ) : (
           <>
-            {message.protection === "firstAccess" && <FirstAccessBanner />}
             <div className="mb-4 inline-flex items-center gap-1.5 rounded-full bg-success-soft px-3 py-1 text-[11px] font-medium text-success ring-1 ring-success/20 animate-fade-in">
               <ShieldCheck className="h-3.5 w-3.5" /> Decrypted securely · Hybrid AES + RSA
             </div>
