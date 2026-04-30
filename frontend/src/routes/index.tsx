@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { Toaster } from "sonner";
 import { ArrowLeft } from "lucide-react";
@@ -12,6 +12,11 @@ import { initialMessages } from "@/components/securesend/mockData";
 import type { Folder, SecureMessage } from "@/components/securesend/types";
 
 export const Route = createFileRoute("/")({
+  beforeLoad: () => {
+    if (typeof window !== "undefined" && localStorage.getItem("isLoggedIn") !== "true") {
+      throw redirect({ to: "/landing" });
+    }
+  },
   component: SecureSendApp,
 });
 

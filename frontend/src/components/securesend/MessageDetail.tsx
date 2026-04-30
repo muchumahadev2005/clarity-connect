@@ -212,19 +212,18 @@ export function MessageDetail({ message, onDelete, onMarkViewed }: Props) {
 
       {/* Body */}
       <div className="flex-1 overflow-y-auto scrollbar-thin px-6 py-6">
-        {isExpired ? (
-          <ExpiredState />
-        ) : !unlocked ? (
+        {!unlocked ? (
           <>
             {message.protection === "hybrid" ? (
               <HybridDecryptingScreen />
             ) : (
               <LockScreen
-                mode={message.protection as "password" | "key" | "quick"}
+                mode={message.protection as "key" | "quick"}
                 value={pwd}
                 onChange={setPwd}
                 onUnlock={handleUnlock}
                 decrypting={decrypting}
+                expired={isExpired}
               />
             )}
             {decrypting && (
@@ -236,6 +235,8 @@ export function MessageDetail({ message, onDelete, onMarkViewed }: Props) {
               </div>
             )}
           </>
+        ) : isExpired ? (
+          <ExpiredState />
         ) : (
           <>
             <div className="mb-4 inline-flex items-center gap-1.5 rounded-full bg-success-soft px-3 py-1 text-[11px] font-medium text-success ring-1 ring-success/20 animate-fade-in">
@@ -341,12 +342,14 @@ function LockScreen({
   onChange,
   onUnlock,
   decrypting,
+  expired,
 }: {
   mode: "password" | "key" | "quick";
   value: string;
   onChange: (v: string) => void;
   onUnlock: () => void;
   decrypting: boolean;
+  expired?: boolean;
 }) {
   const Icon = mode === "key" ? KeyRound : Lock;
   return (
@@ -380,12 +383,16 @@ function LockScreen({
         />
         <button
           onClick={onUnlock}
-          disabled={decrypting}
+          disabled={decrypting || expired}
           className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 font-medium text-primary-foreground shadow-elegant transition-all hover:opacity-95 active:scale-[0.98] disabled:opacity-70"
         >
           {decrypting ? (
             <>
               <Loader2 className="h-4 w-4 animate-spin" /> Decrypting…
+            </>
+          ) : expired ? (
+            <>
+              <AlertTriangle className="h-4 w-4" /> Link Expired
             </>
           ) : (
             <>

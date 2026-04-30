@@ -1,22 +1,27 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, redirect, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type ClipboardEvent } from "react";
 import { Toaster, toast } from "sonner";
 import { ShieldCheck, Mail, KeyRound, Loader2, CheckCircle2, ArrowLeft, Timer } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-export const Route = createFileRoute("/login")({
+export const Route = createFileRoute("/signup")({
+  beforeLoad: () => {
+    if (typeof window !== "undefined" && localStorage.getItem("isLoggedIn") === "true") {
+      throw redirect({ to: "/" });
+    }
+  },
   head: () => ({
     meta: [
-      { title: "Sign in — SecureSend" },
-      { name: "description", content: "Sign in to SecureSend with a one-time code sent to your email." },
-      { property: "og:title", content: "Sign in — SecureSend" },
-      { property: "og:description", content: "Email OTP login for secure, encrypted messaging." },
+      { title: "Sign up — SecureSend" },
+      { name: "description", content: "Sign up for SecureSend with a one-time code sent to your email." },
+      { property: "og:title", content: "Sign up — SecureSend" },
+      { property: "og:description", content: "Email OTP signup for secure, encrypted messaging." },
     ],
   }),
-  component: LoginPage,
+  component: SignupPage,
 });
 
-type Step = "email" | "otp" | "success";
+type Step = "email" | "otp" | "password" | "success";
 
 function maskEmail(email: string) {
   const [user, domain] = email.split("@");
@@ -25,7 +30,7 @@ function maskEmail(email: string) {
   return `${user.slice(0, 2)}${"*".repeat(Math.max(2, user.length - 2))}@${domain}`;
 }
 
-function LoginPage() {
+function SignupPage() {
   const navigate = useNavigate();
   const [step, setStep] = useState<Step>("email");
   const [email, setEmail] = useState("");
@@ -35,6 +40,13 @@ function LoginPage() {
   const [otp, setOtp] = useState<string[]>(["", "", "", "", "", ""]);
   const [otpError, setOtpError] = useState<string | null>(null);
   const [resendIn, setResendIn] = useState(0);
+  
+  // Password state
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
+  
   const inputsRef = useRef<Array<HTMLInputElement | null>>([]);
 
   const emailValid = useMemo(
@@ -122,7 +134,25 @@ function LoginPage() {
       setOtpError("Incorrect code. Try again.");
       return;
     }
+    setStep("password");
+  };
+
+  const handleCreateAccount = async () => {
+    if (password.length < 6) {
+      setPasswordError("Password must be at least 6 characters.");
+      return;
+    }
+    if (password !== confirmPassword) {
+      setPasswordError("Passwords do not match.");
+      return;
+    }
+    setPasswordError(null);
+    setCreating(true);
+    await new Promise((r) => setTimeout(r, 1000));
+    setCreating(false);
+    
     setStep("success");
+    localStorage.setItem("isLoggedIn", "true");
     setTimeout(() => navigate({ to: "/" }), 1400);
   };
 
@@ -154,8 +184,8 @@ function LoginPage() {
                 <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
                   <Mail className="h-6 w-6" />
                 </div>
-                <h1 className="text-2xl font-semibold tracking-tight">Welcome to SecureSend 🔐</h1>
-                <p className="mt-1 text-sm text-muted-foreground">Enter your email to continue</p>
+                <h1 className="text-2xl font-semibold tracking-tight">Create your account 🔐</h1>
+                <p className="mt-1 text-sm text-muted-foreground">Enter your email to sign up</p>
               </div>
 
               <label htmlFor="email" className="mb-1.5 block text-xs font-medium text-muted-foreground">
@@ -201,9 +231,12 @@ function LoginPage() {
                 )}
               </button>
 
-              <p className="mt-4 text-center text-xs text-muted-foreground">
-                We'll email a 6-digit code. No password needed.
-              </p>
+              <div className="mt-6 text-center text-sm text-muted-foreground">
+                Already have an account?{" "}
+                <Link to="/login" className="font-semibold text-primary hover:underline transition-colors">
+                  Sign in
+                </Link>
+              </div>
             </>
           )}
 
@@ -297,12 +330,95 @@ function LoginPage() {
             </>
           )}
 
+          {step === "password" && (
+            <>
+              <div className="mb-6 text-center">
+                <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                  <KeyRound className="h-6 w-6" />
+                </div>
+                <h1 className="text-2xl font-semibold tracking-tight">Create a password</h1>
+                <p className="mt-1 text-sm text-muted-foreground">Secure your account</p>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label htmlFor="password" className="mb-1.5 block text-xs font-medium text-muted-foreground">
+                    Password
+                  </label>
+                  <input
+                    id="password"
+                    type="password"
+                    autoComplete="new-password"
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(e) => {
+                      setPassword(e.target.value);
+                      if (passwordError) setPasswordError(null);
+                    }}
+                    onKeyDown={(e) => e.key === "Enter" && handleCreateAccount()}
+                    className={cn(
+                      "w-full rounded-xl border bg-background px-4 py-3 text-sm outline-none transition-all",
+                      "focus:ring-2 focus:ring-primary/30 focus:border-primary",
+                      passwordError?.includes("at least 6") ? "border-destructive focus:ring-destructive/30 focus:border-destructive" : "border-border",
+                    )}
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="confirmPassword" className="mb-1.5 block text-xs font-medium text-muted-foreground">
+                    Confirm Password
+                  </label>
+                  <input
+                    id="confirmPassword"
+                    type="password"
+                    autoComplete="new-password"
+                    placeholder="••••••••"
+                    value={confirmPassword}
+                    onChange={(e) => {
+                      setConfirmPassword(e.target.value);
+                      if (passwordError) setPasswordError(null);
+                    }}
+                    onKeyDown={(e) => e.key === "Enter" && handleCreateAccount()}
+                    className={cn(
+                      "w-full rounded-xl border bg-background px-4 py-3 text-sm outline-none transition-all",
+                      "focus:ring-2 focus:ring-primary/30 focus:border-primary",
+                      passwordError?.includes("match") ? "border-destructive focus:ring-destructive/30 focus:border-destructive" : "border-border",
+                    )}
+                  />
+                </div>
+              </div>
+
+              {passwordError && (
+                <p className="mt-4 text-center text-xs text-destructive animate-fade-in">{passwordError}</p>
+              )}
+
+              <button
+                onClick={handleCreateAccount}
+                disabled={creating || !password || !confirmPassword}
+                className={cn(
+                  "mt-6 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-medium text-primary-foreground shadow-elegant transition-all",
+                  "hover:opacity-90 hover:-translate-y-0.5 active:translate-y-0",
+                  "disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:translate-y-0",
+                )}
+              >
+                {creating ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Creating account...
+                  </>
+                ) : (
+                  <>Create Account</>
+                )}
+              </button>
+            </>
+          )}
+
           {step === "success" && (
             <div className="py-6 text-center animate-scale-in">
               <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-500/10 text-green-600 dark:text-green-400">
                 <CheckCircle2 className="h-9 w-9" />
               </div>
-              <h1 className="text-2xl font-semibold tracking-tight">Login Successful 🎉</h1>
+              <h1 className="text-2xl font-semibold tracking-tight">Account Created 🎉</h1>
               <p className="mt-1 text-sm text-muted-foreground">Redirecting to your inbox...</p>
               <div className="mx-auto mt-5 h-1 w-32 overflow-hidden rounded-full bg-secondary">
                 <div className="h-full w-full origin-left animate-[fade-in_1.4s_ease-out] bg-primary" />

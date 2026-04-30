@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { useState } from "react";
 import {
   Shield,
@@ -22,6 +22,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
 export const Route = createFileRoute("/landing")({
+  beforeLoad: () => {
+    if (typeof window !== "undefined" && localStorage.getItem("isLoggedIn") === "true") {
+      throw redirect({ to: "/" });
+    }
+  },
   component: LandingPage,
   head: () => ({
     meta: [
@@ -65,29 +70,27 @@ function Nav() {
           <LogoMark />
           <span className="text-base font-semibold tracking-tight">SecureSend</span>
         </Link>
-        <nav className="hidden items-center gap-8 md:flex">
-          <a href="#features" className="text-sm text-muted-foreground transition hover:text-foreground">
-            Features
-          </a>
-          <a href="#how" className="text-sm text-muted-foreground transition hover:text-foreground">
-            How it works
-          </a>
-          <a href="#demo" className="text-sm text-muted-foreground transition hover:text-foreground">
-            Demo
-          </a>
-          <a href="#security" className="text-sm text-muted-foreground transition hover:text-foreground">
-            Security
-          </a>
+        <nav className="hidden items-center gap-1 md:flex rounded-full bg-surface-muted/30 p-1.5 border border-border/40 backdrop-blur-md">
+          {[
+            { label: 'Features', href: '#features' },
+            { label: 'How it works', href: '#how' },
+            { label: 'Demo', href: '#demo' },
+            { label: 'Security', href: '#security' },
+          ].map((item) => (
+            <a
+              key={item.label}
+              href={item.href}
+              className="group relative rounded-full px-4 py-2 text-sm font-medium text-muted-foreground transition-all duration-300 hover:text-primary-foreground active:scale-95"
+            >
+              <div className="absolute inset-0 z-0 scale-75 rounded-full bg-gradient-to-r from-primary to-key opacity-0 transition-all duration-300 ease-out group-hover:scale-100 group-hover:opacity-100 group-hover:shadow-glow-primary" />
+              <span className="relative z-10">{item.label}</span>
+            </a>
+          ))}
         </nav>
         <div className="flex items-center gap-2">
-          <Link to="/login" className="hidden sm:block">
-            <Button variant="ghost" size="sm">
-              Sign in
-            </Button>
-          </Link>
-          <Link to="/">
+          <Link to="/login">
             <Button size="sm" className="group bg-gradient-to-r from-primary to-key text-primary-foreground shadow-glow-primary">
-              Open app
+              Sign in
               <ArrowRight className="transition group-hover:translate-x-0.5" />
             </Button>
           </Link>
@@ -588,7 +591,7 @@ function CTA() {
               <ArrowRight />
             </Button>
           </Link>
-          <Link to="/login">
+          <Link to="/signup">
             <Button
               size="lg"
               variant="outline"

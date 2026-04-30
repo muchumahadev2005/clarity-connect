@@ -373,7 +373,6 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
               {(
                 [
                   { id: "quick", label: "Quick", icon: Sparkles },
-                  { id: "password", label: "Password", icon: Lock },
                   { id: "key", label: "Secret Key", icon: KeyRound },
                   { id: "hybrid", label: "Hybrid 🔐", icon: ShieldCheck },
                 ] as const
@@ -395,14 +394,6 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
                 </button>
               ))}
             </div>
-            {protection === "password" && (
-              <input
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Set a password"
-                className="mt-2 w-full rounded-xl border border-border bg-surface px-3 py-2 text-sm font-mono outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
-              />
-            )}
             {protection === "hybrid" && (
               <div className="mt-3 space-y-3 animate-fade-in">
                 <div className="rounded-xl border border-primary/30 bg-gradient-to-br from-primary-soft/70 to-[oklch(0.95_0.05_290)] p-3.5">

@@ -1,5 +1,5 @@
-import { Inbox, Send, TimerOff, Activity, ShieldCheck, Plus, Menu, VenetianMask } from "lucide-react";
-import { Link } from "@tanstack/react-router";
+import { Inbox, Send, TimerOff, Activity, ShieldCheck, Plus, Menu, VenetianMask, LogOut } from "lucide-react";
+import { Link, useNavigate } from "@tanstack/react-router";
 import type { Folder } from "./types";
 import { cn } from "@/lib/utils";
 
@@ -20,6 +20,13 @@ interface Props {
 }
 
 export function Sidebar({ active, onSelect, onCompose, counts, collapsed, onToggle }: Props) {
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    localStorage.removeItem("isLoggedIn");
+    navigate({ to: "/landing" });
+  };
+
   return (
     <aside
       className={cn(
@@ -111,6 +118,16 @@ export function Sidebar({ active, onSelect, onCompose, counts, collapsed, onTogg
           <VenetianMask className="h-5 w-5 shrink-0 text-anon" />
           {!collapsed && <span className="flex-1 text-left">Anonymous 🎭</span>}
         </Link>
+        <button
+          onClick={handleLogout}
+          className={cn(
+            "flex w-full items-center gap-4 rounded-r-full pl-6 pr-4 py-2 text-sm transition-colors text-foreground/80 hover:bg-destructive/10 hover:text-destructive mt-1",
+            collapsed && "justify-center pl-0 pr-0 py-3 rounded-full mx-auto w-12",
+          )}
+        >
+          <LogOut className="h-5 w-5 shrink-0" />
+          {!collapsed && <span className="flex-1 text-left">Log out</span>}
+        </button>
       </div>
     </aside>
   );
