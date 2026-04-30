@@ -19,6 +19,7 @@ import {
   Copy,
   Check,
 } from "lucide-react";
+import api from "@/lib/api";
 import type { MessageType, ProtectionMode } from "./types";
 import { cn } from "@/lib/utils";
 import { UserSearch } from "./UserSearch";
@@ -94,7 +95,15 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
     (async () => {
       try {
         const { publicKeyB64 } = await loadOrCreateRSAKeyPair();
-        if (!cancelled) setOwnPublicKey(publicKeyB64);
+        if (!cancelled) {
+          setOwnPublicKey(publicKeyB64);
+          // Sync key to backend
+          try {
+            await api.post("/keys/register", { publicKey: publicKeyB64 });
+          } catch (err) {
+            console.error("Failed to sync public key", err);
+          }
+        }
       } catch (e) {
         console.error(e);
       }
@@ -625,8 +634,14 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
               ))}
             </div>
             {sendMode === "direct" && (
-              <div className="mt-2 animate-fade-in">
-                <UserSearch selected={recipient} onSelect={setRecipient} />
+            <div className="mt-2 animate-fade-in">
+                <UserSearch 
+                  selected={recipient} 
+                  onSelect={(email, pubKey) => {
+                    setRecipient(email);
+                    if (pubKey) setHybridReceiverPubKey(pubKey);
+                  }} 
+                />
               </div>
             )}
           </div>

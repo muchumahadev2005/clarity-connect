@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type Clipboar
 import { Toaster, toast } from "sonner";
 import { ShieldCheck, Mail, KeyRound, Loader2, CheckCircle2, ArrowLeft, Timer } from "lucide-react";
 import { cn } from "@/lib/utils";
+import api from "@/lib/api";
 
 export const Route = createFileRoute("/signup")({
   beforeLoad: () => {
@@ -74,21 +75,31 @@ function SignupPage() {
     }
     setEmailError(null);
     setSending(true);
-    await new Promise((r) => setTimeout(r, 900));
-    setSending(false);
-    setStep("otp");
-    setOtp(["", "", "", "", "", ""]);
-    setOtpError(null);
-    setResendIn(30);
-    toast.success(`Code sent to ${maskEmail(email.trim())}`);
+    try {
+      await api.post("/auth/request-otp", { email: email.trim() });
+      setStep("otp");
+      setOtp(["", "", "", "", "", ""]);
+      setOtpError(null);
+      setResendIn(30);
+      toast.success(`Code sent to ${maskEmail(email.trim())}`);
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Failed to send OTP");
+    } finally {
+      setSending(false);
+    }
   };
 
   const handleResend = async () => {
     if (resendIn > 0) return;
-    setOtp(["", "", "", "", "", ""]);
-    setOtpError(null);
-    setResendIn(30);
-    toast.success("New code sent");
+    try {
+      await api.post("/auth/request-otp", { email: email.trim() });
+      setOtp(["", "", "", "", "", ""]);
+      setOtpError(null);
+      setResendIn(30);
+      toast.success("New code sent");
+    } catch (err: any) {
+      toast.error("Failed to resend OTP");
+    }
   };
 
   const handleOtpChange = (idx: number, value: string) => {
@@ -127,14 +138,14 @@ function SignupPage() {
       return;
     }
     setVerifying(true);
-    await new Promise((r) => setTimeout(r, 1000));
-    setVerifying(false);
-    // Demo: accept any code ending in even digit; reject "000000"
-    if (code === "000000") {
-      setOtpError("Incorrect code. Try again.");
-      return;
+    try {
+      await api.post("/auth/verify-otp", { email: email.trim(), otp: code });
+      setStep("password");
+    } catch (err: any) {
+      setOtpError(err.response?.data?.message || "Incorrect code. Try again.");
+    } finally {
+      setVerifying(false);
     }
-    setStep("password");
   };
 
   const handleCreateAccount = async () => {
@@ -148,12 +159,21 @@ function SignupPage() {
     }
     setPasswordError(null);
     setCreating(true);
-    await new Promise((r) => setTimeout(r, 1000));
-    setCreating(false);
-    
-    setStep("success");
-    localStorage.setItem("isLoggedIn", "true");
-    setTimeout(() => navigate({ to: "/" }), 1400);
+    try {
+      const res = await api.post("/auth/signup", {
+        email: email.trim(),
+        password,
+      });
+      
+      localStorage.setItem("token", res.data.token);
+      localStorage.setItem("isLoggedIn", "true");
+      setStep("success");
+      setTimeout(() => navigate({ to: "/" }), 1400);
+    } catch (err: any) {
+      setPasswordError(err.response?.data?.message || "Failed to create account");
+    } finally {
+      setCreating(false);
+    }
   };
 
   return (

@@ -1,0 +1,71 @@
+const mongoose = require('mongoose');
+
+const messageSchema = new mongoose.Schema({
+  encryptedData: {
+    type: String,
+    required: true
+  },
+  encryptedAESKey: {
+    type: String,
+    required: true
+  },
+  iv: {
+    type: String,
+    required: true
+  },
+  senderId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null
+  },
+  receiverId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null
+  },
+  type: {
+    type: String,
+    enum: ['text', 'image', 'voice'],
+    required: true
+  },
+  protection: {
+    type: String,
+    enum: ['quick', 'password', 'key', 'hybrid'],
+    default: 'quick'
+  },
+  password: {
+    type: String,
+    default: null
+  },
+  fileUrl: {
+    type: String,
+    default: null
+  },
+  isAnonymous: {
+    type: Boolean,
+    default: false
+  },
+  viewOnce: {
+    type: Boolean,
+    default: false
+  },
+  expiresAt: {
+    type: Date,
+    default: null
+  }
+}, {
+  timestamps: true
+});
+
+// Logic rule: senderId should be null when isAnonymous = true
+messageSchema.pre('save', function(next) {
+  if (this.isAnonymous) {
+    this.senderId = null;
+  }
+  next();
+});
+
+// Index for self-destruct feature (TTL index)
+messageSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+
+module.exports = mongoose.model('Message', messageSchema);

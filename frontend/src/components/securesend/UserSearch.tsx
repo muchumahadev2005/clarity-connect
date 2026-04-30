@@ -1,16 +1,6 @@
-import { useState, useMemo } from "react";
-import { Search, User, Clock } from "lucide-react";
-
-const CONTACTS = [
-  { name: "Aanya Sharma", email: "aanya.sharma@acme.co" },
-  { name: "Marcus Lee", email: "marcus.lee@northwind.io" },
-  { name: "Priya Nair", email: "priya@legalpartners.com" },
-  { name: "Finance Team", email: "finance@acme.co" },
-  { name: "Devin Park", email: "devin.park@hooli.dev" },
-  { name: "Ops Bot", email: "ops-bot@internal.local" },
-];
-
-const RECENT = ["aanya.sharma@acme.co", "finance@acme.co", "marcus.lee@northwind.io"];
+import { useState, useEffect } from "react";
+import { Search, User, Clock, Loader2 } from "lucide-react";
+import api from "@/lib/api";
 
 function maskEmail(email: string) {
   const [user, domain] = email.split("@");
@@ -19,22 +9,42 @@ function maskEmail(email: string) {
   return `${visible}${"*".repeat(Math.max(1, user.length - 2))}@${domain}`;
 }
 
+interface UserResult {
+  email: string;
+  publicKey: string | null;
+}
+
 interface Props {
   selected: string | null;
-  onSelect: (email: string | null) => void;
+  onSelect: (email: string | null, publicKey?: string | null) => void;
 }
 
 export function UserSearch({ selected, onSelect }: Props) {
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [results, setResults] = useState<UserResult[]>([]);
 
-  const matches = useMemo(() => {
-    if (!q) return [];
-    const v = q.toLowerCase();
-    return CONTACTS.filter((c) => c.name.toLowerCase().includes(v) || c.email.toLowerCase().includes(v)).slice(0, 5);
+  useEffect(() => {
+    if (!q.trim()) {
+      setResults([]);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      setLoading(true);
+      try {
+        const res = await api.get(`/users/search?q=${encodeURIComponent(q)}`);
+        setResults(res.data.data);
+      } catch (err) {
+        console.error("Search failed", err);
+      } finally {
+        setLoading(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
   }, [q]);
-
-  const recent = CONTACTS.filter((c) => RECENT.includes(c.email));
 
   if (selected) {
     return (
@@ -70,54 +80,39 @@ export function UserSearch({ selected, onSelect }: Props) {
           placeholder="Search user by email"
           className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
         />
+        {loading && <Loader2 className="h-3 w-3 animate-spin text-primary" />}
       </div>
       {open && (
         <div className="absolute z-20 mt-1 w-full overflow-hidden rounded-xl border border-border bg-surface shadow-floating animate-fade-in">
-          {q && matches.length > 0 && (
+          {results.length > 0 && (
             <ul className="max-h-56 overflow-y-auto py-1">
-              {matches.map((c) => (
+              {results.map((c) => (
                 <li key={c.email}>
                   <button
-                    onMouseDown={() => onSelect(c.email)}
+                    onMouseDown={() => onSelect(c.email, c.publicKey)}
                     className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-secondary"
                   >
-                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary-soft text-primary text-xs font-semibold">
-                      {c.name[0]}
+                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary-soft text-primary text-xs font-semibold uppercase">
+                      {c.email[0]}
                     </div>
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-medium">{c.name}</p>
-                      <p className="truncate font-mono text-xs text-muted-foreground">{maskEmail(c.email)}</p>
+                      <p className="truncate text-sm font-medium">{c.email}</p>
+                      <p className="truncate font-mono text-[10px] text-muted-foreground">
+                        {c.publicKey ? "🔑 Encryption Active" : "🔓 Plaintext only"}
+                      </p>
                     </div>
                   </button>
                 </li>
               ))}
             </ul>
           )}
-          {!q && (
-            <div className="py-1">
-              <p className="flex items-center gap-1.5 px-3 pt-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                <Clock className="h-3 w-3" /> Recent contacts
-              </p>
-              <ul className="mt-1">
-                {recent.map((c) => (
-                  <li key={c.email}>
-                    <button
-                      onMouseDown={() => onSelect(c.email)}
-                      className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-secondary"
-                    >
-                      <User className="h-4 w-4 text-muted-foreground" />
-                      <div className="min-w-0">
-                        <p className="truncate text-sm">{c.name}</p>
-                        <p className="truncate font-mono text-xs text-muted-foreground">{maskEmail(c.email)}</p>
-                      </div>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </div>
+          {!loading && q && results.length === 0 && (
+            <p className="px-3 py-4 text-center text-xs text-muted-foreground">No users found.</p>
           )}
-          {q && matches.length === 0 && (
-            <p className="px-3 py-4 text-center text-xs text-muted-foreground">No contacts found.</p>
+          {!loading && !q && (
+             <p className="px-3 py-4 text-center text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+               Type to search users...
+             </p>
           )}
         </div>
       )}

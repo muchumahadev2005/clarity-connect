@@ -24,6 +24,9 @@ export function Sidebar({ active, onSelect, onCompose, counts, collapsed, onTogg
 
   const handleLogout = () => {
     localStorage.removeItem("isLoggedIn");
+    localStorage.removeItem("token");
+    localStorage.removeItem("securesend.rsa.publicKey");
+    localStorage.removeItem("securesend.rsa.privateKey");
     navigate({ to: "/landing" });
   };
 

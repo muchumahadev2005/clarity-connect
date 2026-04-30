@@ -91,11 +91,11 @@ export function MessageDetail({ message, onDelete, onMarkViewed }: Props) {
     );
   }
 
-  const expiresAtMs = new Date(message.expiresAt).getTime();
+  const expiresAtMs = message.expiresAt ? new Date(message.expiresAt).getTime() : null;
   const createdAtMs = new Date(message.timestamp).getTime();
-  const totalMs = Math.max(1, expiresAtMs - createdAtMs);
-  const remainingMs = now == null ? expiresAtMs - createdAtMs : expiresAtMs - now;
-  const isExpired = (now != null && remainingMs <= 0) || message.status === "expired";
+  const totalMs = expiresAtMs ? Math.max(1, expiresAtMs - createdAtMs) : 0;
+  const remainingMs = expiresAtMs == null ? 0 : (now == null ? expiresAtMs - createdAtMs : expiresAtMs - now);
+  const isExpired = (expiresAtMs != null && now != null && remainingMs <= 0) || message.status === "expired";
 
   const handleUnlock = async () => {
     if (decrypting) return;
@@ -140,14 +140,15 @@ export function MessageDetail({ message, onDelete, onMarkViewed }: Props) {
         if (message.password && pwd !== message.password) {
           throw new Error("Invalid key or corrupted data");
         }
-        await new Promise((r) => setTimeout(r, 250));
+        setDecryptedBody(message.content);
       }
+      await new Promise((r) => setTimeout(r, 250));
       setDecryptStep(4);
       setUnlocked(true);
       onMarkViewed(message.id);
       toast.success("Message decrypted securely");
     } catch (err) {
-      console.error("Hybrid decryption failed", err);
+      console.error("Decryption failed", err);
       toast.error("Invalid key or corrupted data");
       setDecryptStep(0);
     } finally {
@@ -158,28 +159,32 @@ export function MessageDetail({ message, onDelete, onMarkViewed }: Props) {
   return (
     <div className="flex h-full flex-col bg-surface animate-fade-in">
       {/* Header */}
-      <div className="flex items-start justify-between gap-4 border-b border-border px-6 py-4">
-        <div className="min-w-0">
-          <h2 className="truncate text-lg font-semibold tracking-tight">
-            {message.stealth && !revealed ? "Status update" : message.preview}
-          </h2>
-          <p className="mt-0.5 text-sm text-muted-foreground">
-            From <span className="font-medium text-foreground">{message.sender}</span> ·{" "}
-            <span suppressHydrationWarning>{timeAgo(message.timestamp)}</span>
-          </p>
+      <div className="flex items-center justify-between border-b border-border bg-foreground px-6 py-4 text-background">
+        <div className="flex flex-col">
+          <h3 className="text-lg font-semibold tracking-tight">Encrypted Message</h3>
+          <div className="flex items-center gap-1.5 text-xs text-background/60">
+            <span>From</span>
+            <span className="font-medium text-background/90">{message.sender}</span>
+            <span className="opacity-40">·</span>
+            <span>{timeAgo(message.timestamp)}</span>
+          </div>
         </div>
-        <div className="flex items-center gap-1">
-          <IconBtn label="Reply" icon={Reply} />
-          <IconBtn label="Forward" icon={Forward} />
-          <IconBtn
-            label="Delete"
-            icon={Trash2}
-            danger
+        <div className="flex items-center gap-2">
+          <button className="rounded-full p-2 hover:bg-background/10 transition-colors">
+            <Reply className="h-4 w-4" />
+          </button>
+          <button className="rounded-full p-2 hover:bg-background/10 transition-colors">
+            <Forward className="h-4 w-4" />
+          </button>
+          <button
+            className="rounded-full p-2 hover:bg-destructive/20 hover:text-destructive transition-colors"
             onClick={() => {
               onDelete(message.id);
               toast.success("Message destroyed");
             }}
-          />
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
         </div>
       </div>
 
@@ -191,7 +196,9 @@ export function MessageDetail({ message, onDelete, onMarkViewed }: Props) {
             label="End-to-End Encrypted"
             tone="success"
           />
-          <StatusChip icon={KeyRound} label="Hybrid: AES + RSA" tone="primary" />
+          {message.protection === "hybrid" && (
+            <StatusChip icon={KeyRound} label="Hybrid: AES + RSA" tone="primary" />
+          )}
           {message.protection === "password" && (
             <StatusChip icon={Lock} label="Password Protected" tone="primary" />
           )}
@@ -204,9 +211,11 @@ export function MessageDetail({ message, onDelete, onMarkViewed }: Props) {
           {message.viewOnce && (
             <StatusChip icon={Eye} label="View Once" tone="warning" />
           )}
-          <div className="ml-auto">
-            <CircularTimer remainingMs={remainingMs} totalMs={totalMs} expired={isExpired} />
-          </div>
+          {expiresAtMs && (
+            <div className="ml-auto">
+              <CircularTimer remainingMs={remainingMs} totalMs={totalMs} expired={isExpired} />
+            </div>
+          )}
         </div>
       </div>
 
@@ -240,13 +249,14 @@ export function MessageDetail({ message, onDelete, onMarkViewed }: Props) {
         ) : (
           <>
             <div className="mb-4 inline-flex items-center gap-1.5 rounded-full bg-success-soft px-3 py-1 text-[11px] font-medium text-success ring-1 ring-success/20 animate-fade-in">
-              <ShieldCheck className="h-3.5 w-3.5" /> Decrypted securely · Hybrid AES + RSA
+              <ShieldCheck className="h-3.5 w-3.5" /> Decrypted securely · {message.protection === "hybrid" ? "Hybrid AES + RSA" : "Quick Encryption"}
             </div>
             <UnlockedBody
               message={message}
               revealed={revealed}
               setRevealed={setRevealed}
               decryptedBody={decryptedBody}
+              unlocked={unlocked}
             />
           </>
         )}
@@ -414,11 +424,13 @@ function UnlockedBody({
   revealed,
   setRevealed,
   decryptedBody,
+  unlocked,
 }: {
   message: SecureMessage;
   revealed: boolean;
   setRevealed: (v: boolean) => void;
   decryptedBody?: string | null;
+  unlocked: boolean;
 }) {
   if (message.stealth && !revealed) {
     return (
@@ -457,7 +469,7 @@ function UnlockedBody({
         </div>
       )}
       <p className="whitespace-pre-wrap text-[15px] leading-relaxed text-foreground">
-        {decryptedBody ?? message.content}
+        {unlocked ? (decryptedBody || "[Message is empty]") : message.content}
       </p>
       {message.viewOnce && (
         <div className="flex items-start gap-2 rounded-xl border border-warning/40 bg-warning-soft px-4 py-3 text-xs text-warning-foreground">

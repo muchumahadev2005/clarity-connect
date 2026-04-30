@@ -10,6 +10,8 @@ import { SharePanel } from "@/components/securesend/SharePanel";
 import { AccessLogs } from "@/components/securesend/AccessLogs";
 import { initialMessages } from "@/components/securesend/mockData";
 import type { Folder, SecureMessage } from "@/components/securesend/types";
+import api from "@/lib/api";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/")({
   beforeLoad: () => {
@@ -23,10 +25,57 @@ export const Route = createFileRoute("/")({
 function SecureSendApp() {
   const [messages, setMessages] = useState<SecureMessage[]>(initialMessages);
   const [folder, setFolder] = useState<Folder>("inbox");
-  const [selectedId, setSelectedId] = useState<string | null>(initialMessages[0].id);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState(false);
   const [composeOpen, setComposeOpen] = useState(false);
   const [query, setQuery] = useState("");
+
+  // Fetch real messages from backend
+  useEffect(() => {
+    const fetchMessages = async () => {
+      try {
+        const [inRes, outRes] = await Promise.all([
+          api.get("/messages/inbox"),
+          api.get("/messages/outbox"),
+        ]);
+
+        const mapMsg = (m: any, folder: "inbox" | "sent") => ({
+          id: m._id,
+          folder,
+          sender: folder === "inbox" 
+            ? (m.senderId?.email || "Anonymous") 
+            : `You → ${m.receiverId?.email || "Link"}`,
+          preview: m.type === "text" ? "Encrypted Message" : `Encrypted ${m.type}`,
+          content: "[Secure Message Content]", // Placeholder until decrypted
+          type: m.type,
+          protection: m.protection || "quick",
+          password: m.password || "",
+          expiresAt: m.expiresAt,
+          viewOnce: m.viewOnce,
+          status: "new",
+          timestamp: m.createdAt,
+          views: 0,
+          logs: [],
+          encrypted: {
+            encryptedData: m.encryptedData,
+            encryptedAESKey: m.encryptedAESKey,
+            iv: m.iv,
+          },
+        });
+
+        const allMessages = [
+          ...inRes.data.data.map((m: any) => mapMsg(m, "inbox")),
+          ...outRes.data.data.map((m: any) => mapMsg(m, "sent")),
+        ];
+
+        setMessages(allMessages);
+      } catch (err) {
+        console.error("Failed to fetch messages", err);
+      }
+    };
+
+    fetchMessages();
+  }, []);
 
   // Auto-collapse sidebar on small screens.
   useEffect(() => {
@@ -69,9 +118,16 @@ function SecureSendApp() {
 
   const selected = messages.find((m) => m.id === selectedId) ?? null;
 
-  const handleDelete = (id: string) => {
-    setMessages((ms) => ms.filter((m) => m.id !== id));
-    setSelectedId(null);
+  const handleDelete = async (id: string) => {
+    try {
+      await api.delete(`/messages/${id}`);
+      setMessages((ms) => ms.filter((m) => m.id !== id));
+      setSelectedId(null);
+      toast.success("Message deleted permanently");
+    } catch (err) {
+      console.error("Failed to delete message", err);
+      toast.error("Failed to delete message from server");
+    }
   };
 
   const handleMarkViewed = (id: string) => {
@@ -168,45 +224,66 @@ function SecureSendApp() {
       <ComposeModal
         open={composeOpen}
         onClose={() => setComposeOpen(false)}
-        onEncrypt={(p) => {
-          const expiryLabel =
-            p.expiry < 1 ? "10 sec" : p.expiry < 60 ? `${p.expiry} min` : `${p.expiry / 60} hr`;
-          const newMsg: SecureMessage = {
-            id: `new-${Date.now()}`,
-            folder: "sent",
-            sender: p.sendMode === "direct" && p.recipient ? `You → ${p.recipient}` : "You → recipient",
-            preview: p.type === "text" ? p.content.slice(0, 60) : p.content,
-            content: p.content,
-            type: p.type,
-            protection: p.protection,
-            password: p.password,
-            expiresAt: new Date(Date.now() + p.expiry * 60_000).toISOString(),
-            viewOnce: p.viewOnce,
-            status: "new",
-            timestamp: new Date().toISOString(),
-            views: 0,
-            logs: [],
-            encrypted: p.encrypted,
-          };
-          setMessages((m) => [newMsg, ...m]);
-          setComposeOpen(false);
-          if (p.sendMode === "link") {
-            setShare({
-              open: true,
-              link: p.link,
-              summary: {
-                protection:
-                  p.protection === "password"
-                    ? "Password"
-                    : p.protection === "key"
-                      ? "Secret key"
-                      : p.protection === "hybrid"
-                        ? "Hybrid 🔐"
-                        : "Quick",
-                expiry: expiryLabel,
-                viewOnce: p.viewOnce,
-              },
-            });
+        onEncrypt={async (p) => {
+          try {
+            // Map frontend payload to backend schema
+            const messageData = {
+              encryptedData: p.encrypted.encryptedData,
+              encryptedAESKey: p.encrypted.encryptedAESKey,
+              iv: p.encrypted.iv,
+              type: p.type,
+              protection: p.protection,
+              password: p.password,
+              isAnonymous: p.sendMode === "link",
+              viewOnce: p.viewOnce,
+              expiresAt: p.expiry ? new Date(Date.now() + p.expiry * 60_000).toISOString() : null,
+              recipientEmail: p.recipient, 
+            };
+
+            const res = await api.post("/messages", messageData);
+            
+            const newMsg: SecureMessage = {
+              id: res.data.data._id || `new-${Date.now()}`,
+              folder: "sent",
+              sender: p.sendMode === "direct" && p.recipient ? `You → ${p.recipient}` : "You → recipient",
+              preview: p.type === "text" ? p.content.slice(0, 60) : p.content,
+              content: p.content,
+              type: p.type,
+              protection: p.protection,
+              password: p.password,
+              expiresAt: messageData.expiresAt,
+              viewOnce: p.viewOnce,
+              status: "new",
+              timestamp: new Date().toISOString(),
+              views: 0,
+              logs: [],
+              encrypted: p.encrypted,
+            };
+
+            setMessages((m) => [newMsg, ...m]);
+            setComposeOpen(false);
+            toast.success("Message encrypted and sent!");
+
+            if (p.sendMode === "link") {
+              setShare({
+                open: true,
+                link: `${window.location.origin}/m/${res.data.data._id}`, // Use real ID from backend
+                summary: {
+                  protection:
+                    p.protection === "password"
+                      ? "Password"
+                      : p.protection === "key"
+                        ? "Secret key"
+                        : p.protection === "hybrid"
+                          ? "Hybrid 🔐"
+                          : "Quick",
+                  expiry: p.expiry < 1 ? "10 sec" : p.expiry < 60 ? `${p.expiry} min` : `${p.expiry / 60} hr`,
+                  viewOnce: p.viewOnce,
+                },
+              });
+            }
+          } catch (err: any) {
+            toast.error(err.response?.data?.message || "Failed to send message. Please try again.");
           }
         }}
       />
