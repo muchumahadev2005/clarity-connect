@@ -369,12 +369,13 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
             <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               Protection
             </p>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
               {(
                 [
                   { id: "quick", label: "Quick", icon: Sparkles },
                   { id: "password", label: "Password", icon: Lock },
                   { id: "key", label: "Secret Key", icon: KeyRound },
+                  { id: "hybrid", label: "Hybrid 🔐", icon: ShieldCheck },
                 ] as const
               ).map((p) => (
                 <button
@@ -383,7 +384,9 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
                   className={cn(
                     "flex flex-col items-center gap-1 rounded-xl border px-3 py-3 text-xs transition",
                     protection === p.id
-                      ? "border-primary bg-primary-soft text-accent-foreground font-medium"
+                      ? p.id === "hybrid"
+                        ? "border-primary bg-gradient-to-br from-primary-soft to-[oklch(0.92_0.07_290)] text-primary font-semibold shadow-[0_0_0_4px_oklch(var(--primary)/0.12)]"
+                        : "border-primary bg-primary-soft text-accent-foreground font-medium"
                       : "border-border hover:bg-secondary",
                   )}
                 >
@@ -399,6 +402,79 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
                 placeholder="Set a password"
                 className="mt-2 w-full rounded-xl border border-border bg-surface px-3 py-2 text-sm font-mono outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
               />
+            )}
+            {protection === "hybrid" && (
+              <div className="mt-3 space-y-3 animate-fade-in">
+                <div className="rounded-xl border border-primary/30 bg-gradient-to-br from-primary-soft/70 to-[oklch(0.95_0.05_290)] p-3.5">
+                  <div className="flex items-center gap-2 text-xs font-semibold text-primary">
+                    <ShieldCheck className="h-4 w-4" /> Hybrid Encryption Enabled
+                  </div>
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    AES + RSA secure encryption. Only the intended receiver can decrypt this
+                    message.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                    Receiver
+                  </label>
+                  <input
+                    value={hybridReceiver}
+                    onChange={(e) => setHybridReceiver(e.target.value)}
+                    placeholder="Enter receiver email or username"
+                    className="w-full rounded-xl border border-border bg-surface px-3.5 py-2.5 text-sm outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/15"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1 flex items-center justify-between text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                    <span>Public Key (for demo only)</span>
+                  </label>
+                  <textarea
+                    value={hybridReceiverPubKey}
+                    onChange={(e) => setHybridReceiverPubKey(e.target.value)}
+                    placeholder="Paste Receiver Public Key…"
+                    rows={3}
+                    spellCheck={false}
+                    className="w-full resize-none rounded-xl border border-border bg-surface-muted px-3.5 py-2.5 font-mono text-[11px] leading-relaxed outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/15"
+                  />
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    Ask the receiver to share their public key. This will be automated in
+                    production.
+                  </p>
+                </div>
+
+                <div className="rounded-xl border border-border bg-surface-muted p-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      Your Public Key
+                    </span>
+                    <button
+                      type="button"
+                      onClick={copyOwnKey}
+                      disabled={!ownPublicKey}
+                      className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-medium text-primary transition hover:bg-primary-soft disabled:opacity-50"
+                    >
+                      {ownKeyCopied ? (
+                        <>
+                          <Check className="h-3 w-3" /> Copied
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="h-3 w-3" /> Copy Public Key
+                        </>
+                      )}
+                    </button>
+                  </div>
+                  <p className="mt-1.5 max-h-20 overflow-auto break-all font-mono text-[10px] leading-relaxed text-foreground/70">
+                    {ownPublicKey || "Generating your secure key…"}
+                  </p>
+                  <p className="mt-1.5 text-[11px] text-muted-foreground">
+                    Share this with anyone who wants to send you a hybrid-encrypted message.
+                  </p>
+                </div>
+              </div>
             )}
             {protection === "key" && (
               <div className="mt-3 space-y-2 animate-fade-in">
