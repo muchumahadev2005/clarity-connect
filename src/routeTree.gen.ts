@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as LandingRouteImport } from './routes/landing'
 import { Route as HybridRouteImport } from './routes/hybrid'
 import { Route as AnonymousRouteImport } from './routes/anonymous'
 import { Route as IndexRouteImport } from './routes/index'
@@ -17,6 +18,11 @@ import { Route as IndexRouteImport } from './routes/index'
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LandingRoute = LandingRouteImport.update({
+  id: '/landing',
+  path: '/landing',
   getParentRoute: () => rootRouteImport,
 } as any)
 const HybridRoute = HybridRouteImport.update({
@@ -39,12 +45,14 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/anonymous': typeof AnonymousRoute
   '/hybrid': typeof HybridRoute
+  '/landing': typeof LandingRoute
   '/login': typeof LoginRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/anonymous': typeof AnonymousRoute
   '/hybrid': typeof HybridRoute
+  '/landing': typeof LandingRoute
   '/login': typeof LoginRoute
 }
 export interface FileRoutesById {
@@ -52,20 +60,22 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/anonymous': typeof AnonymousRoute
   '/hybrid': typeof HybridRoute
+  '/landing': typeof LandingRoute
   '/login': typeof LoginRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/anonymous' | '/hybrid' | '/login'
+  fullPaths: '/' | '/anonymous' | '/hybrid' | '/landing' | '/login'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/anonymous' | '/hybrid' | '/login'
-  id: '__root__' | '/' | '/anonymous' | '/hybrid' | '/login'
+  to: '/' | '/anonymous' | '/hybrid' | '/landing' | '/login'
+  id: '__root__' | '/' | '/anonymous' | '/hybrid' | '/landing' | '/login'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AnonymousRoute: typeof AnonymousRoute
   HybridRoute: typeof HybridRoute
+  LandingRoute: typeof LandingRoute
   LoginRoute: typeof LoginRoute
 }
 
@@ -76,6 +86,13 @@ declare module '@tanstack/react-router' {
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/landing': {
+      id: '/landing'
+      path: '/landing'
+      fullPath: '/landing'
+      preLoaderRoute: typeof LandingRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/hybrid': {
@@ -106,6 +123,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AnonymousRoute: AnonymousRoute,
   HybridRoute: HybridRoute,
+  LandingRoute: LandingRoute,
   LoginRoute: LoginRoute,
 }
 export const routeTree = rootRouteImport
