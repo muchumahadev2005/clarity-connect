@@ -52,13 +52,28 @@ export function MessageDetail({ message, onDelete, onMarkViewed }: Props) {
   const now = useStableNow(!!message);
 
   useEffect(() => {
-    // Quick messages auto-open.
+    // Quick and hybrid messages auto-open (hybrid uses RSA private key, no
+    // user-supplied secret to enter).
     setUnlocked(message?.protection === "quick");
     setPwd("");
     setRevealed(false);
     setDecrypting(false);
     setDecryptStep(0);
     setDecryptedBody(null);
+  }, [message?.id]);
+
+  // Auto-trigger hybrid decryption as soon as the message is opened.
+  useEffect(() => {
+    if (
+      message &&
+      message.protection === "hybrid" &&
+      !unlocked &&
+      !decrypting &&
+      decryptStep === 0
+    ) {
+      handleUnlock();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [message?.id]);
 
   if (!message) {
@@ -195,13 +210,17 @@ export function MessageDetail({ message, onDelete, onMarkViewed }: Props) {
           <ExpiredState />
         ) : !unlocked ? (
           <>
-            <LockScreen
-              mode={message.protection as "password" | "key" | "quick"}
-              value={pwd}
-              onChange={setPwd}
-              onUnlock={handleUnlock}
-              decrypting={decrypting}
-            />
+            {message.protection === "hybrid" ? (
+              <HybridDecryptingScreen />
+            ) : (
+              <LockScreen
+                mode={message.protection as "password" | "key" | "quick"}
+                value={pwd}
+                onChange={setPwd}
+                onUnlock={handleUnlock}
+                decrypting={decrypting}
+              />
+            )}
             {decrypting && (
               <div className="mx-auto mt-6 max-w-md animate-fade-in">
                 <HybridSteps mode="decrypt" step={decryptStep} />
