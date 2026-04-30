@@ -22,7 +22,7 @@ import { VoicePlayer } from "./VoicePlayer";
 import { CircularTimer } from "./CircularTimer";
 import { toast } from "sonner";
 import { HybridSteps } from "./HybridSteps";
-import { hybridDecrypt, getOwnPrivateKey } from "./crypto";
+import { hybridDecrypt, getOwnPrivateKey, loadOrCreateRSAKeyPair } from "./crypto";
 
 interface Props {
   message: SecureMessage | null;
@@ -106,7 +106,13 @@ export function MessageDetail({ message, onDelete, onMarkViewed }: Props) {
       if (message.encrypted) {
         await new Promise((r) => setTimeout(r, 250));
         setDecryptStep(2);
-        const privateKey = await getOwnPrivateKey();
+        // Hybrid messages are wrapped with the user's persisted RSA key
+        // (localStorage); other modes still use the demo session key for the
+        // existing in-app flow.
+        const privateKey =
+          message.protection === "hybrid"
+            ? (await loadOrCreateRSAKeyPair()).privateKey
+            : await getOwnPrivateKey();
         // RSA-OAEP unwraps the AES key, then AES-GCM decrypts the body.
         const plaintext = await hybridDecrypt(message.encrypted, privateKey);
         setDecryptStep(3);
@@ -121,7 +127,7 @@ export function MessageDetail({ message, onDelete, onMarkViewed }: Props) {
         } catch {
           /* not an envelope, treat plaintext as body */
         }
-        if (requiredPwd && pwd !== requiredPwd) {
+        if (message.protection !== "hybrid" && requiredPwd && pwd !== requiredPwd) {
           throw new Error("Invalid key or corrupted data");
         }
         setDecryptedBody(body);
@@ -307,6 +313,23 @@ function ExpiredState() {
       <h3 className="mt-4 text-lg font-semibold">This message has self-destructed</h3>
       <p className="mt-1 text-sm text-muted-foreground">
         The contents are no longer recoverable. The original sender can resend if needed.
+      </p>
+    </div>
+  );
+}
+
+function HybridDecryptingScreen() {
+  return (
+    <div className="mx-auto flex max-w-md flex-col items-center text-center animate-scale-in">
+      <div className="relative">
+        <div className="absolute inset-0 rounded-full bg-primary/30 blur-2xl" />
+        <div className="relative flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-primary to-[oklch(0.65_0.18_290)] text-primary-foreground animate-glow-pulse">
+          <Loader2 className="h-9 w-9 animate-spin" />
+        </div>
+      </div>
+      <h3 className="mt-6 text-xl font-semibold tracking-tight">Decrypting securely…</h3>
+      <p className="mt-1.5 text-sm text-muted-foreground">
+        Unwrapping the AES key with your private key. Only you can read this message.
       </p>
     </div>
   );
