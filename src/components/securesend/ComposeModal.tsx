@@ -23,7 +23,12 @@ import type { MessageType, ProtectionMode } from "./types";
 import { cn } from "@/lib/utils";
 import { UserSearch } from "./UserSearch";
 import { HybridSteps } from "./HybridSteps";
-import { hybridEncrypt, getRecipientPublicKey } from "./crypto";
+import {
+  hybridEncrypt,
+  getRecipientPublicKey,
+  importPublicKey,
+  loadOrCreateRSAKeyPair,
+} from "./crypto";
 import type { EncryptedPayload } from "./types";
 import { toast } from "sonner";
 
@@ -76,6 +81,39 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
   const [keyCopied, setKeyCopied] = useState(false);
   const [keyPulse, setKeyPulse] = useState(false);
   const keyInputRef = useRef<HTMLInputElement | null>(null);
+  // Hybrid mode state
+  const [hybridReceiver, setHybridReceiver] = useState("");
+  const [hybridReceiverPubKey, setHybridReceiverPubKey] = useState("");
+  const [ownPublicKey, setOwnPublicKey] = useState<string>("");
+  const [ownKeyCopied, setOwnKeyCopied] = useState(false);
+
+  // Load (or generate) the user's RSA key pair the first time hybrid is opened.
+  useEffect(() => {
+    if (protection !== "hybrid" || ownPublicKey) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { publicKeyB64 } = await loadOrCreateRSAKeyPair();
+        if (!cancelled) setOwnPublicKey(publicKeyB64);
+      } catch (e) {
+        console.error(e);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [protection, ownPublicKey]);
+
+  const copyOwnKey = async () => {
+    if (!ownPublicKey) return;
+    try {
+      await navigator.clipboard.writeText(ownPublicKey);
+      setOwnKeyCopied(true);
+      setTimeout(() => setOwnKeyCopied(false), 1600);
+    } catch {
+      /* ignore */
+    }
+  };
 
   // Auto-generate a secret key when "key" mode is selected and field is empty.
   useEffect(() => {
@@ -129,31 +167,55 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
     setSendMode("link");
     setRecipient(null);
     setEncStep(0);
+    setHybridReceiver("");
+    setHybridReceiverPubKey("");
   };
 
   const submit = async () => {
     const content =
       tab === "text" ? text : tab === "voice" ? "Voice note · 0:24" : fileName ?? "attachment.bin";
     if (!content.trim()) return;
+    if (protection === "hybrid") {
+      if (!hybridReceiver.trim()) {
+        toast.error("Enter the receiver email or username");
+        return;
+      }
+      if (!hybridReceiverPubKey.trim()) {
+        toast.error("Paste the receiver's public key");
+        return;
+      }
+    }
     const link = `https://securesend.app/m/${Math.random().toString(36).slice(2, 10)}`;
     try {
       // Real hybrid encryption with Web Crypto API.
-      // Step 1: generate AES key (inside hybridEncrypt)
       setEncStep(1);
-      const publicKey = await getRecipientPublicKey();
-      // Step 2: encrypt message with AES-GCM
+      // Step 1: select RSA public key — receiver-supplied for hybrid mode,
+      // otherwise the demo session key for quick / password / secret-key modes.
+      let publicKey: CryptoKey;
+      if (protection === "hybrid") {
+        try {
+          publicKey = await importPublicKey(hybridReceiverPubKey);
+        } catch {
+          throw new Error("Invalid receiver public key");
+        }
+      } else {
+        publicKey = await getRecipientPublicKey();
+      }
       setEncStep(2);
-      // Bind the password/secret-key (if any) to the plaintext envelope so the
-      // recipient must supply it to access the decoded payload. The transport
-      // ciphertext itself is always AES+RSA.
+      // Step 2: encrypt envelope (body + protection metadata) with AES-GCM,
+      // then wrap the AES key with the receiver's RSA public key.
       const envelope = JSON.stringify({
         v: 1,
         protection,
         password: password || null,
         body: content,
       });
-      const encrypted = await hybridEncrypt(envelope, publicKey);
-      // Step 3: AES key wrapped with RSA (done inside hybridEncrypt)
+      const base = await hybridEncrypt(envelope, publicKey);
+      const encrypted: EncryptedPayload = {
+        ...base,
+        mode: "hybrid",
+        receiver: protection === "hybrid" ? hybridReceiver.trim() : null,
+      };
       setEncStep(3);
       await new Promise((r) => setTimeout(r, 250));
       setEncStep(4);
@@ -161,18 +223,22 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
         type: tab,
         content,
         protection,
-        password,
+        password: protection === "hybrid" ? "" : password,
         expiry,
         viewOnce,
         link,
         sendMode,
-        recipient,
+        recipient: protection === "hybrid" ? hybridReceiver.trim() : recipient,
         encrypted,
       });
       reset();
     } catch (err) {
       console.error("Hybrid encryption failed", err);
-      toast.error("Encryption failed. Please try again.");
+      toast.error(
+        err instanceof Error && err.message === "Invalid receiver public key"
+          ? "Invalid receiver public key"
+          : "Encryption failed. Please try again.",
+      );
       setEncStep(0);
     }
   };
