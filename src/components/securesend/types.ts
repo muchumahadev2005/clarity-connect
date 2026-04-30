@@ -1,6 +1,6 @@
 export type MessageType = "text" | "voice" | "file";
 export type Folder = "inbox" | "sent" | "expired" | "logs";
-export type ProtectionMode = "quick" | "password" | "key";
+export type ProtectionMode = "quick" | "password" | "key" | "hybrid";
 
 export interface AccessLog {
   viewedAt: string;
@@ -15,6 +15,10 @@ export interface EncryptedPayload {
   encryptedAESKey: string;
   /** base64 12-byte IV */
   iv: string;
+  /** Encryption mode used for this payload */
+  mode?: "hybrid" | "demo";
+  /** Optional receiver identifier (email or username) — UI only */
+  receiver?: string | null;
 }
 
 export interface SecureMessage {
