@@ -151,3 +151,89 @@ export async function getRecipientPublicKey(): Promise<CryptoKey> {
 export async function getOwnPrivateKey(): Promise<CryptoKey> {
   return (await getDemoKeyPair()).privateKey;
 }
+
+// ---------- RSA key pair management (localStorage persisted) ----------
+
+const LS_PUBLIC = "securesend.rsa.publicKey";
+const LS_PRIVATE = "securesend.rsa.privateKey";
+
+export async function generateRSAKeyPair(): Promise<CryptoKeyPair> {
+  return crypto.subtle.generateKey(
+    {
+      name: "RSA-OAEP",
+      modulusLength: 2048,
+      publicExponent: new Uint8Array([1, 0, 1]),
+      hash: "SHA-256",
+    },
+    true,
+    ["encrypt", "decrypt"],
+  );
+}
+
+export async function exportPublicKey(key: CryptoKey): Promise<string> {
+  const spki = await crypto.subtle.exportKey("spki", key);
+  return bufToB64(spki);
+}
+
+export async function exportPrivateKey(key: CryptoKey): Promise<string> {
+  const pkcs8 = await crypto.subtle.exportKey("pkcs8", key);
+  return bufToB64(pkcs8);
+}
+
+export async function importPublicKey(b64: string): Promise<CryptoKey> {
+  return crypto.subtle.importKey(
+    "spki",
+    b64ToBuf(b64.trim()),
+    { name: "RSA-OAEP", hash: "SHA-256" },
+    true,
+    ["encrypt"],
+  );
+}
+
+export async function importPrivateKey(b64: string): Promise<CryptoKey> {
+  return crypto.subtle.importKey(
+    "pkcs8",
+    b64ToBuf(b64.trim()),
+    { name: "RSA-OAEP", hash: "SHA-256" },
+    true,
+    ["decrypt"],
+  );
+}
+
+export async function loadOrCreateRSAKeyPair(): Promise<{
+  publicKey: CryptoKey;
+  privateKey: CryptoKey;
+  publicKeyB64: string;
+}> {
+  if (typeof window === "undefined") {
+    const kp = await generateRSAKeyPair();
+    return {
+      publicKey: kp.publicKey,
+      privateKey: kp.privateKey,
+      publicKeyB64: await exportPublicKey(kp.publicKey),
+    };
+  }
+  const pubB64 = localStorage.getItem(LS_PUBLIC);
+  const privB64 = localStorage.getItem(LS_PRIVATE);
+  if (pubB64 && privB64) {
+    try {
+      const publicKey = await importPublicKey(pubB64);
+      const privateKey = await importPrivateKey(privB64);
+      return { publicKey, privateKey, publicKeyB64: pubB64 };
+    } catch {
+      // fall through and regenerate
+    }
+  }
+  const kp = await generateRSAKeyPair();
+  const newPub = await exportPublicKey(kp.publicKey);
+  const newPriv = await exportPrivateKey(kp.privateKey);
+  localStorage.setItem(LS_PUBLIC, newPub);
+  localStorage.setItem(LS_PRIVATE, newPriv);
+  return { publicKey: kp.publicKey, privateKey: kp.privateKey, publicKeyB64: newPub };
+}
+
+export function clearStoredRSAKeys() {
+  if (typeof window === "undefined") return;
+  localStorage.removeItem(LS_PUBLIC);
+  localStorage.removeItem(LS_PRIVATE);
+}
