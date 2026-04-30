@@ -38,6 +38,12 @@ function ProtectionBadge({ m }: { m: SecureMessage }) {
         <KeyRound className="h-3 w-3" /> Secret Key
       </span>
     );
+  if (m.protection === "hybrid")
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-primary-soft px-2 py-0.5 text-[11px] font-medium text-primary ring-1 ring-primary/20">
+        <KeyRound className="h-3 w-3" /> Hybrid 🔐
+      </span>
+    );
   return (
     <span className="inline-flex items-center gap-1 rounded-full bg-success-soft px-2 py-0.5 text-[11px] font-medium text-success ring-1 ring-success/20">
       <Sparkles className="h-3 w-3" /> Quick

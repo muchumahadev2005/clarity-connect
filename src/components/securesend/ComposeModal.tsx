@@ -23,7 +23,12 @@ import type { MessageType, ProtectionMode } from "./types";
 import { cn } from "@/lib/utils";
 import { UserSearch } from "./UserSearch";
 import { HybridSteps } from "./HybridSteps";
-import { hybridEncrypt, getRecipientPublicKey } from "./crypto";
+import {
+  hybridEncrypt,
+  getRecipientPublicKey,
+  importPublicKey,
+  loadOrCreateRSAKeyPair,
+} from "./crypto";
 import type { EncryptedPayload } from "./types";
 import { toast } from "sonner";
 
@@ -76,6 +81,39 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
   const [keyCopied, setKeyCopied] = useState(false);
   const [keyPulse, setKeyPulse] = useState(false);
   const keyInputRef = useRef<HTMLInputElement | null>(null);
+  // Hybrid mode state
+  const [hybridReceiver, setHybridReceiver] = useState("");
+  const [hybridReceiverPubKey, setHybridReceiverPubKey] = useState("");
+  const [ownPublicKey, setOwnPublicKey] = useState<string>("");
+  const [ownKeyCopied, setOwnKeyCopied] = useState(false);
+
+  // Load (or generate) the user's RSA key pair the first time hybrid is opened.
+  useEffect(() => {
+    if (protection !== "hybrid" || ownPublicKey) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { publicKeyB64 } = await loadOrCreateRSAKeyPair();
+        if (!cancelled) setOwnPublicKey(publicKeyB64);
+      } catch (e) {
+        console.error(e);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [protection, ownPublicKey]);
+
+  const copyOwnKey = async () => {
+    if (!ownPublicKey) return;
+    try {
+      await navigator.clipboard.writeText(ownPublicKey);
+      setOwnKeyCopied(true);
+      setTimeout(() => setOwnKeyCopied(false), 1600);
+    } catch {
+      /* ignore */
+    }
+  };
 
   // Auto-generate a secret key when "key" mode is selected and field is empty.
   useEffect(() => {
@@ -129,31 +167,55 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
     setSendMode("link");
     setRecipient(null);
     setEncStep(0);
+    setHybridReceiver("");
+    setHybridReceiverPubKey("");
   };
 
   const submit = async () => {
     const content =
       tab === "text" ? text : tab === "voice" ? "Voice note · 0:24" : fileName ?? "attachment.bin";
     if (!content.trim()) return;
+    if (protection === "hybrid") {
+      if (!hybridReceiver.trim()) {
+        toast.error("Enter the receiver email or username");
+        return;
+      }
+      if (!hybridReceiverPubKey.trim()) {
+        toast.error("Paste the receiver's public key");
+        return;
+      }
+    }
     const link = `https://securesend.app/m/${Math.random().toString(36).slice(2, 10)}`;
     try {
       // Real hybrid encryption with Web Crypto API.
-      // Step 1: generate AES key (inside hybridEncrypt)
       setEncStep(1);
-      const publicKey = await getRecipientPublicKey();
-      // Step 2: encrypt message with AES-GCM
+      // Step 1: select RSA public key — receiver-supplied for hybrid mode,
+      // otherwise the demo session key for quick / password / secret-key modes.
+      let publicKey: CryptoKey;
+      if (protection === "hybrid") {
+        try {
+          publicKey = await importPublicKey(hybridReceiverPubKey);
+        } catch {
+          throw new Error("Invalid receiver public key");
+        }
+      } else {
+        publicKey = await getRecipientPublicKey();
+      }
       setEncStep(2);
-      // Bind the password/secret-key (if any) to the plaintext envelope so the
-      // recipient must supply it to access the decoded payload. The transport
-      // ciphertext itself is always AES+RSA.
+      // Step 2: encrypt envelope (body + protection metadata) with AES-GCM,
+      // then wrap the AES key with the receiver's RSA public key.
       const envelope = JSON.stringify({
         v: 1,
         protection,
         password: password || null,
         body: content,
       });
-      const encrypted = await hybridEncrypt(envelope, publicKey);
-      // Step 3: AES key wrapped with RSA (done inside hybridEncrypt)
+      const base = await hybridEncrypt(envelope, publicKey);
+      const encrypted: EncryptedPayload = {
+        ...base,
+        mode: "hybrid",
+        receiver: protection === "hybrid" ? hybridReceiver.trim() : null,
+      };
       setEncStep(3);
       await new Promise((r) => setTimeout(r, 250));
       setEncStep(4);
@@ -161,18 +223,22 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
         type: tab,
         content,
         protection,
-        password,
+        password: protection === "hybrid" ? "" : password,
         expiry,
         viewOnce,
         link,
         sendMode,
-        recipient,
+        recipient: protection === "hybrid" ? hybridReceiver.trim() : recipient,
         encrypted,
       });
       reset();
     } catch (err) {
       console.error("Hybrid encryption failed", err);
-      toast.error("Encryption failed. Please try again.");
+      toast.error(
+        err instanceof Error && err.message === "Invalid receiver public key"
+          ? "Invalid receiver public key"
+          : "Encryption failed. Please try again.",
+      );
       setEncStep(0);
     }
   };
@@ -303,12 +369,13 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
             <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               Protection
             </p>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
               {(
                 [
                   { id: "quick", label: "Quick", icon: Sparkles },
                   { id: "password", label: "Password", icon: Lock },
                   { id: "key", label: "Secret Key", icon: KeyRound },
+                  { id: "hybrid", label: "Hybrid 🔐", icon: ShieldCheck },
                 ] as const
               ).map((p) => (
                 <button
@@ -317,7 +384,9 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
                   className={cn(
                     "flex flex-col items-center gap-1 rounded-xl border px-3 py-3 text-xs transition",
                     protection === p.id
-                      ? "border-primary bg-primary-soft text-accent-foreground font-medium"
+                      ? p.id === "hybrid"
+                        ? "border-primary bg-gradient-to-br from-primary-soft to-[oklch(0.92_0.07_290)] text-primary font-semibold shadow-[0_0_0_4px_oklch(var(--primary)/0.12)]"
+                        : "border-primary bg-primary-soft text-accent-foreground font-medium"
                       : "border-border hover:bg-secondary",
                   )}
                 >
@@ -333,6 +402,79 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
                 placeholder="Set a password"
                 className="mt-2 w-full rounded-xl border border-border bg-surface px-3 py-2 text-sm font-mono outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
               />
+            )}
+            {protection === "hybrid" && (
+              <div className="mt-3 space-y-3 animate-fade-in">
+                <div className="rounded-xl border border-primary/30 bg-gradient-to-br from-primary-soft/70 to-[oklch(0.95_0.05_290)] p-3.5">
+                  <div className="flex items-center gap-2 text-xs font-semibold text-primary">
+                    <ShieldCheck className="h-4 w-4" /> Hybrid Encryption Enabled
+                  </div>
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    AES + RSA secure encryption. Only the intended receiver can decrypt this
+                    message.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                    Receiver
+                  </label>
+                  <input
+                    value={hybridReceiver}
+                    onChange={(e) => setHybridReceiver(e.target.value)}
+                    placeholder="Enter receiver email or username"
+                    className="w-full rounded-xl border border-border bg-surface px-3.5 py-2.5 text-sm outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/15"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1 flex items-center justify-between text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                    <span>Public Key (for demo only)</span>
+                  </label>
+                  <textarea
+                    value={hybridReceiverPubKey}
+                    onChange={(e) => setHybridReceiverPubKey(e.target.value)}
+                    placeholder="Paste Receiver Public Key…"
+                    rows={3}
+                    spellCheck={false}
+                    className="w-full resize-none rounded-xl border border-border bg-surface-muted px-3.5 py-2.5 font-mono text-[11px] leading-relaxed outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/15"
+                  />
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    Ask the receiver to share their public key. This will be automated in
+                    production.
+                  </p>
+                </div>
+
+                <div className="rounded-xl border border-border bg-surface-muted p-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      Your Public Key
+                    </span>
+                    <button
+                      type="button"
+                      onClick={copyOwnKey}
+                      disabled={!ownPublicKey}
+                      className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-medium text-primary transition hover:bg-primary-soft disabled:opacity-50"
+                    >
+                      {ownKeyCopied ? (
+                        <>
+                          <Check className="h-3 w-3" /> Copied
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="h-3 w-3" /> Copy Public Key
+                        </>
+                      )}
+                    </button>
+                  </div>
+                  <p className="mt-1.5 max-h-20 overflow-auto break-all font-mono text-[10px] leading-relaxed text-foreground/70">
+                    {ownPublicKey || "Generating your secure key…"}
+                  </p>
+                  <p className="mt-1.5 text-[11px] text-muted-foreground">
+                    Share this with anyone who wants to send you a hybrid-encrypted message.
+                  </p>
+                </div>
+              </div>
             )}
             {protection === "key" && (
               <div className="mt-3 space-y-2 animate-fade-in">

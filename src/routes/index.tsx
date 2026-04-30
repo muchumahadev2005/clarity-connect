@@ -191,7 +191,13 @@ function SecureSendApp() {
               link: p.link,
               summary: {
                 protection:
-                  p.protection === "password" ? "Password" : p.protection === "key" ? "Secret key" : "Quick",
+                  p.protection === "password"
+                    ? "Password"
+                    : p.protection === "key"
+                      ? "Secret key"
+                      : p.protection === "hybrid"
+                        ? "Hybrid 🔐"
+                        : "Quick",
                 expiry: expiryLabel,
                 viewOnce: p.viewOnce,
               },
