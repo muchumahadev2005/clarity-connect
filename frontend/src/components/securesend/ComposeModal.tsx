@@ -18,6 +18,7 @@ import {
   RefreshCw,
   Copy,
   Check,
+  Download,
 } from "lucide-react";
 import api from "@/lib/api";
 import type { MessageType, ProtectionMode } from "./types";
@@ -75,6 +76,39 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
   const [expiry, setExpiry] = useState(10);
   const [viewOnce, setViewOnce] = useState(false);
   const [recording, setRecording] = useState(false);
+  const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+
+  const toggleRecording = async () => {
+    if (recording) {
+      mediaRecorderRef.current?.stop();
+      setRecording(false);
+    } else {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const recorder = new MediaRecorder(stream);
+        mediaRecorderRef.current = recorder;
+        audioChunksRef.current = [];
+
+        recorder.ondataavailable = (e) => {
+          if (e.data.size > 0) audioChunksRef.current.push(e.data);
+        };
+
+        recorder.onstop = () => {
+          const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+          setAudioBlob(blob);
+          stream.getTracks().forEach(track => track.stop());
+        };
+
+        recorder.start();
+        setRecording(true);
+      } catch (err) {
+        console.error("Error accessing microphone:", err);
+        toast.error("Could not access microphone");
+      }
+    }
+  };
   const [fileName, setFileName] = useState<string | null>(null);
   const [sendMode, setSendMode] = useState<"link" | "direct">("link");
   const [recipient, setRecipient] = useState<string | null>(null);
@@ -153,6 +187,20 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
     }
   };
 
+  const downloadKey = () => {
+    if (!password) return;
+    const blob = new Blob([`SecureSend Message Key\n\nKey: ${password}\n\nKeep this key safe. Anyone with this key can decrypt your message.`], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `securesend-key-${password.slice(-4)}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast.success("Key downloaded as .txt file");
+  };
+
   const keyError =
     protection === "key"
       ? !password
@@ -181,9 +229,23 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
   };
 
   const submit = async () => {
-    const content =
-      tab === "text" ? text : tab === "voice" ? "Voice note · 0:24" : fileName ?? "attachment.bin";
-    if (!content.trim()) return;
+    let finalContent = text;
+    if (tab === "voice") {
+      if (!audioBlob) {
+        toast.error("Please record a message first");
+        return;
+      }
+      const reader = new FileReader();
+      const base64Promise = new Promise<string>((resolve) => {
+        reader.onloadend = () => resolve(reader.result as string);
+      });
+      reader.readAsDataURL(audioBlob);
+      finalContent = await base64Promise;
+    } else if (tab === "file") {
+      finalContent = fileName ?? "attachment.bin";
+    }
+
+    if (!finalContent.trim()) return;
     if (protection === "hybrid") {
       if (!hybridReceiver.trim()) {
         toast.error("Enter the receiver email or username");
@@ -217,7 +279,7 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
         v: 1,
         protection,
         password: password || null,
-        body: content,
+        body: finalContent,
       });
       const base = await hybridEncrypt(envelope, publicKey);
       const encrypted: EncryptedPayload = {
@@ -230,7 +292,7 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
       setEncStep(4);
       onEncrypt({
         type: tab,
-        content,
+        content: finalContent,
         protection,
         password: protection === "hybrid" ? "" : password,
         expiry,
@@ -334,7 +396,8 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
           {tab === "voice" && (
             <div className="flex flex-col items-center justify-center rounded-2xl border border-border bg-surface-muted py-10">
               <button
-                onClick={() => setRecording((r) => !r)}
+                type="button"
+                onClick={toggleRecording}
                 className={cn(
                   "flex h-16 w-16 items-center justify-center rounded-full text-primary-foreground transition shadow-elegant",
                   recording ? "bg-destructive animate-pulse" : "bg-primary",
@@ -343,8 +406,11 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
                 {recording ? <Square className="h-6 w-6" /> : <Circle className="h-6 w-6" />}
               </button>
               <p className="mt-3 text-sm text-muted-foreground">
-                {recording ? "Recording… tap to stop" : "Tap to record"}
+                {recording ? "Recording… tap to stop" : audioBlob ? "Recording saved! Tap to re-record" : "Tap to record"}
               </p>
+              {audioBlob && !recording && (
+                <p className="mt-2 text-[10px] text-success font-medium">✓ Ready to send securely</p>
+              )}
               {recording && (
                 <div className="mt-4 flex h-8 items-center gap-0.5">
                   {Array.from({ length: 28 }).map((_, i) => (
@@ -517,6 +583,14 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
                         Copy
                       </>
                     )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={downloadKey}
+                    title="Download key as .txt"
+                    className="inline-flex items-center gap-1 rounded-lg px-2 text-xs font-medium text-foreground/70 transition hover:bg-secondary active:scale-95 border-l border-border/50"
+                  >
+                    <Download className="h-3.5 w-3.5" />
                   </button>
                   <button
                     type="button"

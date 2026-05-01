@@ -1,33 +1,71 @@
 import { useEffect, useRef, useState } from "react";
 import { Play, Pause, Mic } from "lucide-react";
 
-export function VoicePlayer({ duration = 32 }: { duration?: number }) {
+export function VoicePlayer({ duration = 32, audioSrc }: { duration?: number, audioSrc?: string }) {
   const [playing, setPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
-  const ref = useRef<number | null>(null);
+  const [currentTime, setCurrentTime] = useState(0);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const timerRef = useRef<number | null>(null);
 
   useEffect(() => {
-    if (!playing) {
-      if (ref.current) window.clearInterval(ref.current);
+    if (audioSrc && !audioRef.current) {
+      audioRef.current = new Audio(audioSrc);
+      audioRef.current.onended = () => {
+        setPlaying(false);
+        setProgress(100);
+      };
+      audioRef.current.ontimeupdate = () => {
+        if (audioRef.current) {
+          setCurrentTime(audioRef.current.currentTime);
+          setProgress((audioRef.current.currentTime / audioRef.current.duration) * 100);
+        }
+      };
+    }
+  }, [audioSrc]);
+
+  const togglePlay = () => {
+    if (!audioRef.current) {
+      setPlaying(!playing);
       return;
     }
-    ref.current = window.setInterval(() => {
-      setProgress((p) => {
-        const next = p + 100 / (duration * 10);
-        if (next >= 100) {
-          setPlaying(false);
-          return 100;
-        }
-        return next;
-      });
-    }, 100);
-    return () => {
-      if (ref.current) window.clearInterval(ref.current);
-    };
-  }, [playing, duration]);
 
-  const cur = Math.floor((progress / 100) * duration);
-  const mm = (n: number) => `0:${n.toString().padStart(2, "0")}`;
+    if (playing) {
+      audioRef.current.pause();
+    } else {
+      audioRef.current.play().catch(console.error);
+    }
+    setPlaying(!playing);
+  };
+
+  useEffect(() => {
+    if (!audioSrc && playing) {
+      timerRef.current = window.setInterval(() => {
+        setProgress((p) => {
+          const next = p + 100 / (duration * 10);
+          if (next >= 100) {
+            setPlaying(false);
+            return 100;
+          }
+          return next;
+        });
+      }, 100);
+    } else if (!playing && timerRef.current) {
+      window.clearInterval(timerRef.current);
+    }
+    return () => {
+      if (timerRef.current) window.clearInterval(timerRef.current);
+    };
+  }, [playing, duration, audioSrc]);
+
+  const mm = (n: number) => {
+    const min = Math.floor(n / 60);
+    const sec = Math.floor(n % 60);
+    return `${min}:${sec.toString().padStart(2, "0")}`;
+  };
+
+  const displayTime = audioRef.current?.duration ? currentTime : (progress / 100) * duration;
+  const displayDuration = audioRef.current?.duration || duration;
 
   return (
     <div className="rounded-2xl border border-border bg-gradient-to-br from-surface to-surface-muted p-4 shadow-elegant">
@@ -36,7 +74,7 @@ export function VoicePlayer({ duration = 32 }: { duration?: number }) {
       </div>
       <div className="mt-3 flex items-center gap-3">
         <button
-          onClick={() => setPlaying((p) => !p)}
+          onClick={togglePlay}
           className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-elegant transition-all hover:opacity-90 active:scale-90"
           aria-label={playing ? "Pause" : "Play"}
         >
@@ -62,8 +100,8 @@ export function VoicePlayer({ duration = 32 }: { duration?: number }) {
             })}
           </div>
           <div className="mt-1 flex justify-between text-[11px] text-muted-foreground tabular-nums">
-            <span>{mm(cur)}</span>
-            <span>{mm(duration)}</span>
+            <span>{mm(displayTime)}</span>
+            <span>{mm(displayDuration)}</span>
           </div>
         </div>
       </div>

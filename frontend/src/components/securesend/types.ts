@@ -6,6 +6,7 @@ export interface AccessLog {
   viewedAt: string;
   ip: string;
   device: string;
+  viewer?: string;
 }
 
 export interface EncryptedPayload {

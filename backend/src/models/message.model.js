@@ -60,7 +60,8 @@ const messageSchema = new mongoose.Schema({
   logs: [{
     viewedAt: { type: Date, default: Date.now },
     ip: String,
-    device: String
+    device: String,
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null }
   }]
 }, {
   timestamps: true

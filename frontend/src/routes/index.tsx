@@ -29,15 +29,19 @@ function SecureSendApp() {
   const [collapsed, setCollapsed] = useState(false);
   const [composeOpen, setComposeOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const [user, setUser] = useState<{ email: string } | null>(null);
 
-  // Fetch real messages from backend
+  // Fetch real messages and user profile from backend
   useEffect(() => {
-    const fetchMessages = async () => {
+    const fetchAppContent = async () => {
       try {
-        const [inRes, outRes] = await Promise.all([
+        const [inRes, outRes, userRes] = await Promise.all([
           api.get("/messages/inbox"),
           api.get("/messages/outbox"),
+          api.get("/auth/me")
         ]);
+
+        setUser(userRes.data.user);
 
         const mapMsg = (m: any, folder: "inbox" | "sent") => ({
           id: m._id,
@@ -52,7 +56,7 @@ function SecureSendApp() {
           password: m.password || "",
           expiresAt: m.expiresAt,
           viewOnce: m.viewOnce,
-          status: "new",
+          status: m.expiresAt && new Date(m.expiresAt) < new Date() ? "expired" : "new",
           timestamp: m.createdAt,
           views: m.views || 0,
           logs: m.logs || [],
@@ -74,7 +78,25 @@ function SecureSendApp() {
       }
     };
 
-    fetchMessages();
+    fetchAppContent();
+
+    // Periodically check for expired messages in local state
+    const interval = setInterval(() => {
+      setMessages((prev) => {
+        const now = new Date();
+        let changed = false;
+        const next = prev.map((m) => {
+          if (m.expiresAt && new Date(m.expiresAt) < now && m.status !== "expired") {
+            changed = true;
+            return { ...m, status: "expired" as const };
+          }
+          return m;
+        });
+        return changed ? next : prev;
+      });
+    }, 10000); // Check every 10 seconds
+
+    return () => clearInterval(interval);
   }, []);
 
   // Auto-collapse sidebar on small screens.
@@ -92,28 +114,29 @@ function SecureSendApp() {
     summary: { protection: string; expiry: string; viewOnce: boolean };
   }>({ open: false, link: "", summary: { protection: "Quick", expiry: "10 min", viewOnce: false } });
 
-  const counts = useMemo<Record<Folder, number>>(
-    () => ({
-      inbox: messages.filter((m) => m.folder === "inbox" && m.status !== "expired").length,
-      sent: messages.filter((m) => m.folder === "sent").length,
-      expired: messages.filter((m) => m.status === "expired").length,
-      logs: messages.reduce((n, m) => n + m.logs.length, 0),
-    }),
-    [messages],
-  );
+  const counts: Record<Folder, number> = {
+    inbox: messages.filter((m) => m.folder === "inbox").length,
+    sent: messages.filter((m) => m.folder === "sent").length,
+    expired: messages.filter((m) => m.status === "expired").length,
+    logs: 0,
+  };
 
   const filtered = useMemo(() => {
-    if (folder === "logs") return [];
-    return messages
-      .filter((m) =>
-        folder === "expired" ? m.status === "expired" : m.folder === folder && m.status !== "expired",
-      )
-      .filter(
+    let list = messages.filter((m) => {
+      if (folder === "expired") return m.status === "expired";
+      return m.folder === folder;
+    });
+
+    if (query.trim()) {
+      const q = query.toLowerCase();
+      list = list.filter(
         (m) =>
-          !query ||
-          m.sender.toLowerCase().includes(query.toLowerCase()) ||
-          m.preview.toLowerCase().includes(query.toLowerCase()),
+          m.sender.toLowerCase().includes(q) ||
+          m.preview.toLowerCase().includes(q) ||
+          (m.content && m.content.toLowerCase().includes(q)),
       );
+    }
+    return list;
   }, [messages, folder, query]);
 
   const selected = messages.find((m) => m.id === selectedId) ?? null;
@@ -168,6 +191,7 @@ function SecureSendApp() {
         counts={counts}
         collapsed={collapsed}
         onToggle={() => setCollapsed((c) => !c)}
+        user={user}
       />
 
       <main className="flex flex-1 overflow-hidden">

@@ -324,14 +324,28 @@ function IconBtn({
 
 function ExpiredState() {
   return (
-    <div className="mx-auto flex max-w-md flex-col items-center text-center animate-fade-in">
-      <div className="flex h-16 w-16 items-center justify-center rounded-full bg-destructive/10 text-destructive">
-        <AlertTriangle className="h-8 w-8" />
+    <div className="flex h-full flex-col items-center justify-center p-8 text-center animate-fade-in">
+      <div className="relative mb-6">
+        <div className="absolute inset-0 rounded-full bg-destructive/10 blur-xl" />
+        <div className="relative flex h-20 w-20 items-center justify-center rounded-full bg-destructive/10 text-destructive">
+          <Trash2 className="h-10 w-10" />
+        </div>
+        <div className="absolute -bottom-1 -right-1 flex h-8 w-8 items-center justify-center rounded-full bg-surface border-2 border-background text-destructive shadow-lg">
+          <AlertTriangle className="h-4 w-4" />
+        </div>
       </div>
-      <h3 className="mt-4 text-lg font-semibold">This message has self-destructed</h3>
-      <p className="mt-1 text-sm text-muted-foreground">
-        The contents are no longer recoverable. The original sender can resend if needed.
+      <h3 className="text-xl font-bold text-foreground">Message Self-Destructed</h3>
+      <p className="mt-2 max-w-sm text-sm text-muted-foreground leading-relaxed">
+        The security timer for this message has reached zero. All encrypted content and keys have been permanently wiped from our systems.
       </p>
+      <div className="mt-8 flex flex-col items-center gap-2">
+        <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-destructive/60">
+          <ShieldCheck className="h-3 w-3" /> Zero-Knowledge Security
+        </div>
+        <div className="h-1 w-32 rounded-full bg-border overflow-hidden">
+          <div className="h-full w-full bg-destructive/30" />
+        </div>
+      </div>
     </div>
   );
 }
@@ -458,7 +472,9 @@ function UnlockedBody({
 
   return (
     <div className={`space-y-5 ${message.stealth ? "animate-blur-in" : "animate-fade-in"}`}>
-      {message.type === "voice" && <VoicePlayer />}
+      {message.type === "voice" && (
+        <VoicePlayer audioSrc={unlocked ? (decryptedBody || undefined) : undefined} />
+      )}
       {message.type === "file" && (
         <div className="flex items-center justify-between rounded-2xl border border-border bg-surface-muted p-4">
           <div className="flex items-center gap-3">

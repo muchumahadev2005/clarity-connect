@@ -166,12 +166,28 @@ exports.markViewed = async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'Message not found' });
     }
 
+    // Capture viewer identity if they are logged in
+    let viewerId = null;
+    const authHeader = req.headers.authorization;
+    console.log('Auth Header:', authHeader ? 'Present' : 'Missing');
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      try {
+        const token = authHeader.split(' ')[1];
+        const decoded = require('jsonwebtoken').verify(token, process.env.JWT_SECRET);
+        viewerId = decoded.id;
+        console.log('Viewer ID Decoded:', viewerId);
+      } catch (e) {
+        console.log('Token Verification Failed:', e.message);
+      }
+    }
+
     // Update views and logs
     message.views += 1;
     message.logs.push({
       viewedAt: new Date(),
       ip: req.ip || req.connection.remoteAddress || '127.0.0.1',
-      device: fullDeviceInfo
+      device: fullDeviceInfo,
+      userId: viewerId
     });
 
     // Handle View Once logic
@@ -183,11 +199,19 @@ exports.markViewed = async (req, res, next) => {
 
     await message.save();
 
+    // Fetch updated message with populated log users
+    const updatedMessage = await Message.findById(id).populate('logs.userId', 'email');
+
     res.status(200).json({ 
       success: true, 
       data: { 
-        views: message.views, 
-        logs: message.logs 
+        views: updatedMessage.views, 
+        logs: updatedMessage.logs.map(l => ({
+          viewedAt: l.viewedAt,
+          ip: l.ip,
+          device: l.device,
+          viewer: l.userId ? l.userId.email : 'Someone (Guest)'
+        }))
       } 
     });
   } catch (err) {

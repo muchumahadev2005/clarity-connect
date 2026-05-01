@@ -47,7 +47,7 @@ export function AccessLogs({ messages, onToggleSidebar }: { messages: SecureMess
                     </span>
                   </div>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    Opened by <span className="font-medium text-foreground">{entry.message.sender}</span>
+                    Opened by <span className="font-medium text-foreground">{entry.viewer || "Someone"}</span>
                   </p>
                   <div className="mt-3 flex flex-wrap gap-2">
                     <span className="inline-flex items-center gap-1.5 rounded-full bg-surface px-2.5 py-1 text-[11px] text-foreground/80 ring-1 ring-border">

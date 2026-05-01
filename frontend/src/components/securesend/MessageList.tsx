@@ -1,4 +1,4 @@
-import { Lock, KeyRound, Eye, FileText, Paperclip, Search, EyeOff, Sparkles, Zap, Menu } from "lucide-react";
+import { Lock, KeyRound, Eye, FileText, Paperclip, Search, EyeOff, Sparkles, Zap, Menu, TimerOff, Inbox } from "lucide-react";
 import type { Folder, SecureMessage } from "./types";
 import { cn } from "@/lib/utils";
 import { timeAgo } from "./utils";
@@ -82,10 +82,22 @@ export function MessageList({ folder, messages, selectedId, onSelect, query, onQ
 
       <div className="flex-1 overflow-y-auto scrollbar-thin">
         {messages.length === 0 ? (
-          <div className="flex h-full flex-col items-center justify-center px-6 text-center text-muted-foreground">
-            <EyeOff className="mb-3 h-10 w-10 opacity-50" />
-            <p className="text-sm">No messages here.</p>
-          </div>
+          folder === "expired" ? (
+            <div className="flex h-full flex-col items-center justify-center p-8 text-center text-muted-foreground animate-fade-in">
+              <div className="mb-4 rounded-full bg-surface-muted p-4">
+                <TimerOff className="h-8 w-8 opacity-40" />
+              </div>
+              <h3 className="text-lg font-semibold text-foreground">No expired messages</h3>
+              <p className="mt-1 max-w-xs text-sm">
+                Messages that have reached their self-destruct limit will appear here for reference after their content is wiped.
+              </p>
+            </div>
+          ) : (
+            <div className="flex h-full flex-col items-center justify-center px-6 text-center text-muted-foreground">
+              <Inbox className="mb-3 h-10 w-10 opacity-50" />
+              <p className="text-sm">No messages here.</p>
+            </div>
+          )
         ) : (
           <ul>
             {messages.map((m) => {

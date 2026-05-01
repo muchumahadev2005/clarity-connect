@@ -17,9 +17,10 @@ interface Props {
   counts: Record<Folder, number>;
   collapsed: boolean;
   onToggle: () => void;
+  user: { email: string } | null;
 }
 
-export function Sidebar({ active, onSelect, onCompose, counts, collapsed, onToggle }: Props) {
+export function Sidebar({ active, onSelect, onCompose, counts, collapsed, onToggle, user }: Props) {
   const navigate = useNavigate();
 
   const handleLogout = () => {
@@ -130,6 +131,23 @@ export function Sidebar({ active, onSelect, onCompose, counts, collapsed, onTogg
         )}
 
         <div className={cn("border-t border-border px-2 py-2", collapsed && "md:px-1")}>
+          {user && (
+            <div className={cn(
+              "mb-2 flex items-center gap-3 rounded-xl px-4 py-3 transition-colors",
+              collapsed ? "md:justify-center md:px-0" : ""
+            )}>
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary-soft text-primary font-bold text-xs">
+                {user.email.charAt(0).toUpperCase()}
+              </div>
+              {(!collapsed || (collapsed && window.innerWidth < 768)) && (
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-xs font-semibold text-foreground">{user.email}</p>
+                  <p className="text-[10px] text-muted-foreground">Logged in</p>
+                </div>
+              )}
+            </div>
+          )}
+
           <Link
             to="/anonymous"
             onClick={() => { if (window.innerWidth < 768) onToggle(); }}
