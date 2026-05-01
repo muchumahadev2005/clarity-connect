@@ -52,21 +52,26 @@ export function MessageDetail({ message, onDelete, onMarkViewed }: Props) {
   const now = useStableNow(!!message);
 
   useEffect(() => {
-    // Quick and hybrid messages auto-open (hybrid uses RSA private key, no
-    // user-supplied secret to enter).
-    setUnlocked(message?.protection === "quick");
+    // Quick and hybrid messages auto-open.
+    // If a message has a real encrypted payload, we don't set 'unlocked' to true
+    // immediately; we let handleUnlock() perform the decryption first.
+    const isQuick = message?.protection === "quick";
+    const needsDecryption = !!message?.encrypted;
+
+    setUnlocked(isQuick && !needsDecryption);
     setPwd("");
     setRevealed(false);
     setDecrypting(false);
     setDecryptStep(0);
-    setDecryptedBody(null);
+    setDecryptedBody(isQuick && !needsDecryption ? message.content : null);
   }, [message?.id]);
 
   // Auto-trigger hybrid decryption as soon as the message is opened.
   useEffect(() => {
     if (
       message &&
-      message.protection === "hybrid" &&
+      (message.protection === "hybrid" ||
+        (message.protection === "quick" && message.encrypted)) &&
       !unlocked &&
       !decrypting &&
       decryptStep === 0
@@ -74,7 +79,7 @@ export function MessageDetail({ message, onDelete, onMarkViewed }: Props) {
       handleUnlock();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [message?.id]);
+  }, [message?.id, unlocked]);
 
   if (!message) {
     return (
@@ -221,7 +226,9 @@ export function MessageDetail({ message, onDelete, onMarkViewed }: Props) {
 
       {/* Body */}
       <div className="flex-1 overflow-y-auto scrollbar-thin px-6 py-6">
-        {!unlocked ? (
+        {isExpired ? (
+          <ExpiredState />
+        ) : !unlocked ? (
           <>
             {message.protection === "hybrid" ? (
               <HybridDecryptingScreen />

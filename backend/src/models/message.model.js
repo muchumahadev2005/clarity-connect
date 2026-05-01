@@ -52,7 +52,16 @@ const messageSchema = new mongoose.Schema({
   expiresAt: {
     type: Date,
     default: null
-  }
+  },
+  views: {
+    type: Number,
+    default: 0
+  },
+  logs: [{
+    viewedAt: { type: Date, default: Date.now },
+    ip: String,
+    device: String
+  }]
 }, {
   timestamps: true
 });

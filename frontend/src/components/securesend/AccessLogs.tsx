@@ -1,8 +1,8 @@
-import { Eye, Globe, Monitor, Clock, Activity } from "lucide-react";
+import { Eye, Globe, Monitor, Clock, Activity, Menu } from "lucide-react";
 import type { SecureMessage } from "./types";
 import { timeAgo } from "./utils";
 
-export function AccessLogs({ messages }: { messages: SecureMessage[] }) {
+export function AccessLogs({ messages, onToggleSidebar }: { messages: SecureMessage[], onToggleSidebar?: () => void }) {
   const all = messages
     .flatMap((m) => m.logs.map((l) => ({ ...l, message: m })))
     .sort((a, b) => new Date(b.viewedAt).getTime() - new Date(a.viewedAt).getTime());
@@ -10,9 +10,18 @@ export function AccessLogs({ messages }: { messages: SecureMessage[] }) {
   return (
     <div className="flex h-full flex-col bg-surface">
       <div className="border-b border-border px-6 py-4">
-        <div className="flex items-center gap-2">
-          <Activity className="h-5 w-5 text-primary" />
-          <h2 className="text-lg font-semibold tracking-tight">Access Logs</h2>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => onToggleSidebar?.()}
+            className="md:hidden rounded-full p-2 hover:bg-secondary transition-colors -ml-2"
+            aria-label="Open menu"
+          >
+            <Menu className="h-5 w-5 text-muted-foreground" />
+          </button>
+          <div className="flex items-center gap-2">
+            <Activity className="h-5 w-5 text-primary" />
+            <h2 className="text-lg font-semibold tracking-tight">Access Logs</h2>
+          </div>
         </div>
         <p className="mt-0.5 text-sm text-muted-foreground">
           Every time someone opens one of your messages.

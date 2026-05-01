@@ -7,6 +7,9 @@ const userRoutes = require('./routes/user.routes');
 
 const app = express();
 
+// Trust proxy for express-rate-limit (e.g. Nginx, Heroku)
+app.set('trust proxy', 1);
+
 app.use(cors());
 app.use(express.json());
 

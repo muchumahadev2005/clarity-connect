@@ -54,8 +54,8 @@ function SecureSendApp() {
           viewOnce: m.viewOnce,
           status: "new",
           timestamp: m.createdAt,
-          views: 0,
-          logs: [],
+          views: m.views || 0,
+          logs: m.logs || [],
           encrypted: {
             encryptedData: m.encryptedData,
             encryptedAESKey: m.encryptedAESKey,
@@ -130,26 +130,24 @@ function SecureSendApp() {
     }
   };
 
-  const handleMarkViewed = (id: string) => {
-    setMessages((ms) =>
-      ms.map((m) =>
-        m.id === id
-          ? {
-              ...m,
-              status: "viewed",
-              views: m.views + 1,
-              logs: [
-                ...m.logs,
-                {
-                  viewedAt: new Date().toISOString(),
-                  ip: "127.0.0.1",
-                  device: "Chrome · this device",
-                },
-              ],
-            }
-          : m,
-      ),
-    );
+  const handleMarkViewed = async (id: string) => {
+    try {
+      const res = await api.post(`/messages/${id}/view`);
+      setMessages((ms) =>
+        ms.map((m) =>
+          m.id === id
+            ? {
+                ...m,
+                status: "viewed",
+                views: res.data.data.views,
+                logs: res.data.data.logs,
+              }
+            : m,
+        ),
+      );
+    } catch (err) {
+      console.error("Failed to mark message as viewed", err);
+    }
   };
 
   return (
@@ -175,7 +173,7 @@ function SecureSendApp() {
       <main className="flex flex-1 overflow-hidden">
         {folder === "logs" ? (
           <div className="flex-1">
-            <AccessLogs messages={messages} />
+            <AccessLogs messages={messages} onToggleSidebar={() => setCollapsed(!collapsed)} />
           </div>
         ) : (
           <>
@@ -192,6 +190,7 @@ function SecureSendApp() {
                 onSelect={setSelectedId}
                 query={query}
                 onQuery={setQuery}
+                onToggleSidebar={() => setCollapsed(!collapsed)}
               />
             </div>
             <div

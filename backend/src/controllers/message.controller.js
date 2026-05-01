@@ -11,7 +11,8 @@ exports.sendMessage = async (req, res, next) => {
       type, 
       protection,
       password,
-      expiresIn 
+      expiresIn,
+      expiresAt: frontendExpiresAt
     } = req.body;
 
     const senderId = req.user.id;
@@ -39,6 +40,8 @@ exports.sendMessage = async (req, res, next) => {
       if (!isNaN(ms)) {
         expiresAt = new Date(Date.now() + ms);
       }
+    } else if (frontendExpiresAt) {
+      expiresAt = new Date(frontendExpiresAt);
     }
 
     const message = new Message({
@@ -111,6 +114,58 @@ exports.deleteMessage = async (req, res, next) => {
     await Message.findByIdAndDelete(id);
 
     res.status(200).json({ success: true, message: 'Message deleted successfully' });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.markViewed = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    
+    // Detect device info from User-Agent
+    const userAgent = req.headers['user-agent'] || 'Unknown Device';
+    let device = 'Desktop';
+    if (/mobile/i.test(userAgent)) device = 'Mobile';
+    if (/tablet/i.test(userAgent)) device = 'Tablet';
+    
+    // Extract browser/system info for more detail
+    const systemMatch = userAgent.match(/\(([^)]+)\)/);
+    const systemInfo = systemMatch ? systemMatch[1].split(';')[0] : 'Unknown OS';
+    const browserMatch = userAgent.match(/(firefox|msie|chrome|safari|opr|edge)/i);
+    const browserInfo = browserMatch ? browserMatch[0] : 'Browser';
+
+    const fullDeviceInfo = `${browserInfo} · ${systemInfo} (${device})`;
+
+    const message = await Message.findById(id);
+    if (!message) {
+      return res.status(404).json({ success: false, message: 'Message not found' });
+    }
+
+    // Update views and logs
+    message.views += 1;
+    message.logs.push({
+      viewedAt: new Date(),
+      ip: req.ip || req.connection.remoteAddress || '127.0.0.1',
+      device: fullDeviceInfo
+    });
+
+    // Handle View Once logic
+    if (message.viewOnce && message.views > 1) {
+       // It was already viewed once before this call (this is the 2nd view)
+       // Or we can handle it such that the next fetch sees it as expired
+       // For now, let's just keep the log
+    }
+
+    await message.save();
+
+    res.status(200).json({ 
+      success: true, 
+      data: { 
+        views: message.views, 
+        logs: message.logs 
+      } 
+    });
   } catch (err) {
     next(err);
   }

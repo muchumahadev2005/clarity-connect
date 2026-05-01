@@ -1,4 +1,4 @@
-import { Lock, KeyRound, Eye, FileText, Paperclip, Search, EyeOff, Sparkles, Zap } from "lucide-react";
+import { Lock, KeyRound, Eye, FileText, Paperclip, Search, EyeOff, Sparkles, Zap, Menu } from "lucide-react";
 import type { Folder, SecureMessage } from "./types";
 import { cn } from "@/lib/utils";
 import { timeAgo } from "./utils";
@@ -11,6 +11,7 @@ interface Props {
   onSelect: (id: string) => void;
   query: string;
   onQuery: (q: string) => void;
+  onToggleSidebar?: () => void;
 }
 
 const folderTitle: Record<Folder, string> = {
@@ -51,12 +52,21 @@ function ProtectionBadge({ m }: { m: SecureMessage }) {
   );
 }
 
-export function MessageList({ folder, messages, selectedId, onSelect, query, onQuery }: Props) {
+export function MessageList({ folder, messages, selectedId, onSelect, query, onQuery, onToggleSidebar }: Props) {
   return (
     <div className="flex h-full flex-col bg-surface">
       <div className="border-b border-border px-5 py-4">
         <div className="flex items-center justify-between gap-3">
-          <h2 className="text-lg font-semibold tracking-tight">{folderTitle[folder]}</h2>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => onToggleSidebar?.()}
+              className="md:hidden rounded-full p-2 hover:bg-secondary transition-colors"
+              aria-label="Open menu"
+            >
+              <Menu className="h-5 w-5 text-muted-foreground" />
+            </button>
+            <h2 className="text-lg font-semibold tracking-tight">{folderTitle[folder]}</h2>
+          </div>
           <span className="text-xs text-muted-foreground">{messages.length} messages</span>
         </div>
         <div className="mt-3 flex items-center gap-2 rounded-full bg-surface-muted px-4 py-2">

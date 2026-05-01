@@ -30,7 +30,7 @@ export interface SecureMessage {
   type: MessageType;
   protection: ProtectionMode;
   password?: string;
-  expiresAt: string; // ISO
+  expiresAt: string | null; // ISO
   viewOnce: boolean;
   status: "new" | "viewed" | "expired";
   timestamp: string; // ISO
