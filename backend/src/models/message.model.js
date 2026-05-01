@@ -74,7 +74,7 @@ messageSchema.pre('save', function(next) {
   next();
 });
 
-// Index for self-destruct feature (TTL index)
-messageSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+// Index for expiresAt to allow efficient querying
+messageSchema.index({ expiresAt: 1 });
 
 module.exports = mongoose.model('Message', messageSchema);

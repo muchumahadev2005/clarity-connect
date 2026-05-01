@@ -76,7 +76,19 @@ exports.getInbox = async (req, res, next) => {
       .sort({ createdAt: -1 })
       .populate('senderId', 'email');
 
-    res.status(200).json({ success: true, data: messages });
+    // Soft-expiry logic: Wipe sensitive data if expiresAt is passed
+    const now = new Date();
+    const processedMessages = await Promise.all(messages.map(async (m) => {
+      if (m.expiresAt && m.expiresAt < now && m.encryptedData) {
+        m.encryptedData = ""; // Wipe content
+        m.encryptedAESKey = ""; // Wipe key
+        m.iv = ""; // Wipe IV
+        await m.save();
+      }
+      return m;
+    }));
+
+    res.status(200).json({ success: true, data: processedMessages });
   } catch (err) {
     next(err);
   }
@@ -90,7 +102,19 @@ exports.getOutbox = async (req, res, next) => {
       .sort({ createdAt: -1 })
       .populate('receiverId', 'email');
 
-    res.status(200).json({ success: true, data: messages });
+    // Soft-expiry logic: Wipe sensitive data if expiresAt is passed
+    const now = new Date();
+    const processedMessages = await Promise.all(messages.map(async (m) => {
+      if (m.expiresAt && m.expiresAt < now && m.encryptedData) {
+        m.encryptedData = ""; // Wipe content
+        m.encryptedAESKey = ""; // Wipe key
+        m.iv = ""; // Wipe IV
+        await m.save();
+      }
+      return m;
+    }));
+
+    res.status(200).json({ success: true, data: processedMessages });
   } catch (err) {
     next(err);
   }
