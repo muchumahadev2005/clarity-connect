@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Toaster, toast } from "sonner";
 import {
   VenetianMask,
@@ -13,6 +13,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import api from "@/lib/api";
 
 export const Route = createFileRoute("/anonymous")({
   component: AnonymousMail,
@@ -37,13 +38,6 @@ interface AnonEmail {
   sender: string;
   time: string;
   unread?: boolean;
-}
-
-function generateAlias() {
-  const chars = "abcdefghijkmnopqrstuvwxyz23456789";
-  let s = "";
-  for (let i = 0; i < 5; i++) s += chars[Math.floor(Math.random() * chars.length)];
-  return `${s}@securesend.co.in`;
 }
 
 const initialInbox: AnonEmail[] = [
@@ -80,41 +74,102 @@ function AnonymousMail() {
   const [view, setView] = useState<View>("dashboard");
   const [inbox, setInbox] = useState<AnonEmail[]>(initialInbox);
   const [openEmail, setOpenEmail] = useState<AnonEmail | null>(null);
-  const [alias, setAlias] = useState<string>(() => generateAlias());
+  const [alias, setAlias] = useState<string | null>(null);
   const [aliasPulse, setAliasPulse] = useState(false);
+  const [aliasLoading, setAliasLoading] = useState(false);
+  const [aliasError, setAliasError] = useState<string | null>(null);
 
   const [to, setTo] = useState("");
   const [subject, setSubject] = useState("");
   const [message, setMessage] = useState("");
+  const [sending, setSending] = useState(false);
 
-  const copyAlias = async () => {
-    await navigator.clipboard.writeText(alias);
-    toast.success("Alias copied to clipboard");
+  /**
+   * Generate a random alias string (6-10 characters, a-z0-9)
+   * Frontend-only, no authentication required
+   */
+  const generateRandomAlias = (): string => {
+    const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
+    const length = Math.floor(Math.random() * 5) + 6; // 6-10 chars
+    let result = "";
+    for (let i = 0; i < length; i++) {
+      result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return result;
   };
 
-  const regenerateAlias = () => {
-    let next = generateAlias();
-    if (next === alias) next = generateAlias();
-    setAlias(next);
-    setAliasPulse(true);
-    window.setTimeout(() => setAliasPulse(false), 900);
-    toast.success("New alias generated", {
-      description: next,
+  // Generate or retrieve alias on component mount
+  useEffect(() => {
+    const existingAlias = localStorage.getItem("anonAlias");
+
+    if (existingAlias) {
+      // Reuse existing alias from this session
+      setAlias(existingAlias);
+      console.log("[AnonymousMail] Using existing session alias:", existingAlias);
+    } else {
+      // Generate new random alias
+      const newAlias = generateRandomAlias();
+      localStorage.setItem("anonAlias", newAlias);
+      setAlias(newAlias);
+      console.log("[AnonymousMail] Generated new alias:", newAlias);
+    }
+  }, []);
+
+  const copyAlias = async () => {
+    if (!alias) return;
+    const fullEmail = `${alias}@securesend.co.in`;
+    await navigator.clipboard.writeText(fullEmail);
+    toast.success("Email address copied to clipboard", {
+      description: fullEmail,
     });
   };
 
-  const sendAnon = () => {
+  const regenerateAlias = () => {
+    // Generate new alias locally (no backend call)
+    const newAlias = generateRandomAlias();
+    localStorage.setItem("anonAlias", newAlias);
+    setAlias(newAlias);
+    setAliasPulse(true);
+    window.setTimeout(() => setAliasPulse(false), 900);
+    const fullEmail = `${newAlias}@securesend.co.in`;
+    toast.success("New alias generated", {
+      description: fullEmail,
+    });
+    console.log("[AnonymousMail] Alias regenerated:", newAlias);
+  };
+
+  const sendAnon = async () => {
     if (!to || !subject || !message) {
       toast.error("Please fill all fields");
       return;
     }
-    toast.success("Sent anonymously 🎭", {
-      description: "Your identity stays hidden.",
-    });
-    setTo("");
-    setSubject("");
-    setMessage("");
-    setView("dashboard");
+
+    if (!alias) {
+      toast.error("Alias not available. Please refresh the page.");
+      return;
+    }
+
+    setSending(true);
+    try {
+      await api.post("/anonymous/send", {
+        to: to.trim(),
+        subject: subject.trim(),
+        message: message.trim(),
+        alias,
+      });
+
+      toast.success("Sent anonymously 🎭", {
+        description: "The email was delivered through SecureSend.",
+      });
+      setTo("");
+      setSubject("");
+      setMessage("");
+      setView("dashboard");
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Failed to send anonymous email");
+    } finally {
+      setSending(false);
+    }
   };
 
   return (
@@ -147,6 +202,8 @@ function AnonymousMail() {
             alias={alias}
             pulse={aliasPulse}
             inboxCount={inbox.length}
+            aliasLoading={aliasLoading}
+            aliasError={aliasError}
           />
         )}
 
@@ -160,6 +217,7 @@ function AnonymousMail() {
             onSubject={setSubject}
             onMessage={setMessage}
             onSend={sendAnon}
+            sending={sending}
             onBack={() => setView("dashboard")}
           />
         )}
@@ -170,9 +228,7 @@ function AnonymousMail() {
             emails={inbox}
             onOpen={(e) => {
               setOpenEmail(e);
-              setInbox((prev) =>
-                prev.map((m) => (m.id === e.id ? { ...m, unread: false } : m)),
-              );
+              setInbox((prev) => prev.map((m) => (m.id === e.id ? { ...m, unread: false } : m)));
               setView("read");
             }}
             onBack={() => setView("dashboard")}
@@ -195,14 +251,18 @@ function Dashboard({
   alias,
   pulse,
   inboxCount,
+  aliasLoading,
+  aliasError,
 }: {
   onCompose: () => void;
   onInbox: () => void;
   onCopy: () => void;
   onRegenerate: () => void;
-  alias: string;
+  alias: string | null;
   pulse: boolean;
   inboxCount: number;
+  aliasLoading: boolean;
+  aliasError: string | null;
 }) {
   return (
     <div className="space-y-8">
@@ -223,52 +283,82 @@ function Dashboard({
       <div
         className={cn(
           "rounded-2xl border bg-surface p-6 shadow-elegant transition-all duration-500",
-          pulse
-            ? "border-anon/60 ring-2 ring-anon/30 shadow-floating"
-            : "border-border",
+          aliasError
+            ? "border-red-300 bg-red-50 ring-1 ring-red-200"
+            : pulse
+              ? "border-anon/60 ring-2 ring-anon/30 shadow-floating"
+              : "border-border",
         )}
       >
         <div className="flex items-center justify-between">
           <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
             Your alias address
           </div>
-          <span className="inline-flex items-center gap-1 rounded-full bg-anon-soft px-2 py-0.5 text-[10px] font-semibold text-anon ring-1 ring-anon/20">
-            <span className="h-1.5 w-1.5 rounded-full bg-anon animate-pulse" />
-            Active Alias
-          </span>
-        </div>
-        <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-anon to-[oklch(0.65_0.18_240)] text-anon-foreground">
-              <Mail className="h-5 w-5" />
-            </div>
-            <span
-              key={alias}
-              className="truncate font-mono text-lg font-semibold animate-fade-in"
-            >
-              {alias}
+          {!aliasError && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-anon-soft px-2 py-0.5 text-[10px] font-semibold text-anon ring-1 ring-anon/20">
+              <span className="h-1.5 w-1.5 rounded-full bg-anon animate-pulse" />
+              Active Alias
             </span>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={onCopy}
-              className="inline-flex items-center gap-2 rounded-full bg-anon-soft px-3.5 py-2 text-sm font-medium text-anon ring-1 ring-anon/20 hover:bg-anon hover:text-anon-foreground transition-colors"
-            >
-              <Copy className="h-4 w-4" /> Copy
-            </button>
-            <button
-              onClick={onRegenerate}
-              className="inline-flex items-center gap-2 rounded-full bg-anon px-3.5 py-2 text-sm font-medium text-anon-foreground ring-1 ring-anon hover:opacity-90 transition-all"
-            >
-              <RefreshCw className={cn("h-4 w-4", pulse && "animate-spin")} />
-              Regenerate
-            </button>
-          </div>
+          )}
         </div>
-        <div className="mt-4 flex items-center gap-2 text-xs text-muted-foreground">
-          <ShieldCheck className="h-3.5 w-3.5 text-success" />
-          🔐 Your alias hides your real email. You can regenerate it anytime.
-        </div>
+
+        {aliasError ? (
+          <div className="mt-4 flex items-center gap-3 rounded-lg bg-red-100 p-3 text-sm text-red-800">
+            <div className="text-lg">⚠️</div>
+            <div className="flex-1">
+              <p className="font-medium">{aliasError}</p>
+              <p className="mt-1 text-xs text-red-700">
+                Try logging in again or refreshing the page.
+              </p>
+            </div>
+          </div>
+        ) : (
+          <>
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-linear-to-br from-anon to-[oklch(0.65_0.18_240)] text-anon-foreground">
+                  <Mail className="h-5 w-5" />
+                </div>
+                {aliasLoading ? (
+                  <div className="flex items-center gap-2">
+                    <div className="h-2 w-24 bg-surface-muted rounded animate-pulse"></div>
+                    <span className="text-xs text-muted-foreground">Loading...</span>
+                  </div>
+                ) : alias ? (
+                  <span
+                    key={alias}
+                    className="truncate font-mono text-lg font-semibold animate-fade-in"
+                  >
+                    {alias}@securesend.co.in
+                  </span>
+                ) : (
+                  <span className="text-sm text-muted-foreground">Failed to load alias</span>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={onCopy}
+                  disabled={!alias || aliasLoading}
+                  className="inline-flex items-center gap-2 rounded-full bg-anon-soft px-3.5 py-2 text-sm font-medium text-anon ring-1 ring-anon/20 hover:bg-anon hover:text-anon-foreground transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Copy className="h-4 w-4" /> Copy
+                </button>
+                <button
+                  onClick={onRegenerate}
+                  disabled={aliasLoading}
+                  className="inline-flex items-center gap-2 rounded-full bg-anon px-3.5 py-2 text-sm font-medium text-anon-foreground ring-1 ring-anon hover:opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <RefreshCw className={cn("h-4 w-4", pulse && "animate-spin")} />
+                  Regenerate
+                </button>
+              </div>
+            </div>
+            <div className="mt-4 flex items-center gap-2 text-xs text-muted-foreground">
+              <ShieldCheck className="h-3.5 w-3.5 text-success" />
+              🔐 Your alias hides your real email. You can regenerate it anytime.
+            </div>
+          </>
+        )}
       </div>
 
       {/* Actions */}
@@ -301,9 +391,7 @@ function Dashboard({
               </span>
             )}
           </div>
-          <p className="text-sm text-muted-foreground">
-            Read messages people sent to your alias.
-          </p>
+          <p className="text-sm text-muted-foreground">Read messages people sent to your alias.</p>
         </button>
       </div>
 
@@ -313,8 +401,7 @@ function Dashboard({
           How it works
         </div>
         <p className="mt-1 leading-relaxed">
-          Replies come back to your alias inbox. We never share your real email with the
-          recipient.
+          Replies come back to your alias inbox. We never share your real email with the recipient.
         </p>
       </div>
     </div>
@@ -330,9 +417,10 @@ function Compose({
   onSubject,
   onMessage,
   onSend,
+  sending,
   onBack,
 }: {
-  alias: string;
+  alias: string | null;
   to: string;
   subject: string;
   message: string;
@@ -340,6 +428,7 @@ function Compose({
   onSubject: (v: string) => void;
   onMessage: (v: string) => void;
   onSend: () => void;
+  sending: boolean;
   onBack: () => void;
 }) {
   return (
@@ -353,12 +442,19 @@ function Compose({
 
       <div className="rounded-2xl border border-border bg-surface p-6 shadow-elegant">
         <div className="mb-4 flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-anon-soft text-anon">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-anon-soft text-anon ring-1 ring-anon/20">
             <VenetianMask className="h-5 w-5" />
           </div>
           <div>
             <h2 className="text-lg font-semibold">New anonymous email</h2>
-            <p className="text-xs text-muted-foreground">From: {alias}</p>
+            <p className="text-xs text-muted-foreground">
+              From:{" "}
+              {alias ? (
+                `${alias}@securesend.co.in`
+              ) : (
+                <span className="text-muted-foreground">Loading...</span>
+              )}
+            </p>
           </div>
         </div>
 
@@ -401,9 +497,10 @@ function Compose({
 
         <button
           onClick={onSend}
+          disabled={sending}
           className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-full bg-anon px-5 py-3 text-sm font-medium text-anon-foreground shadow-elegant hover:shadow-floating transition-all"
         >
-          <Send className="h-4 w-4" /> Send Anonymously 🎭
+          <Send className="h-4 w-4" /> {sending ? "Sending..." : "Send Anonymously 🎭"}
         </button>
       </div>
     </div>
@@ -427,7 +524,7 @@ function InboxView({
   onOpen,
   onBack,
 }: {
-  alias: string;
+  alias: string | null;
   emails: AnonEmail[];
   onOpen: (e: AnonEmail) => void;
   onBack: () => void;
@@ -458,7 +555,8 @@ function InboxView({
       <div>
         <h2 className="text-2xl font-semibold tracking-tight">Anonymous Inbox</h2>
         <p className="text-sm text-muted-foreground">
-          Messages sent to <span className="font-mono">{alias}</span>
+          Messages sent to{" "}
+          <span className="font-mono">{alias ? `${alias}@securesend.co.in` : "Loading..."}</span>
         </p>
       </div>
 
@@ -539,7 +637,7 @@ function ReadEmail({
   email,
   onBack,
 }: {
-  alias: string;
+  alias: string | null;
   email: AnonEmail;
   onBack: () => void;
 }) {
@@ -554,7 +652,7 @@ function ReadEmail({
 
       <article className="rounded-2xl border border-border bg-surface p-6 shadow-elegant">
         <div className="flex items-center gap-3 border-b border-border pb-4">
-          <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-anon to-[oklch(0.65_0.18_240)] text-anon-foreground">
+          <div className="flex h-11 w-11 items-center justify-center rounded-full bg-linear-to-br from-anon to-[oklch(0.65_0.18_240)] text-anon-foreground">
             <VenetianMask className="h-5 w-5" />
           </div>
           <div>

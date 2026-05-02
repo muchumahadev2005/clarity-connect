@@ -52,7 +52,7 @@ function LandingPage() {
   const scaleX = useSpring(scrollYProgress, {
     stiffness: 100,
     damping: 30,
-    restDelta: 0.001
+    restDelta: 0.001,
   });
 
   return (
@@ -86,24 +86,27 @@ function Nav() {
         </Link>
         <nav className="hidden items-center gap-1 md:flex rounded-full bg-surface-muted/30 p-1.5 border border-border/40 backdrop-blur-md">
           {[
-            { label: 'Features', href: '#features' },
-            { label: 'How it works', href: '#how' },
-            { label: 'Demo', href: '#demo' },
-            { label: 'Security', href: '#security' },
+            { label: "Features", href: "#features" },
+            { label: "How it works", href: "#how" },
+            { label: "Demo", href: "#demo" },
+            { label: "Security", href: "#security" },
           ].map((item) => (
             <a
               key={item.label}
               href={item.href}
               className="group relative rounded-full px-4 py-2 text-sm font-medium text-muted-foreground transition-all duration-300 hover:text-primary-foreground active:scale-95"
             >
-              <div className="absolute inset-0 z-0 scale-75 rounded-full bg-gradient-to-r from-primary to-key opacity-0 transition-all duration-300 ease-out group-hover:scale-100 group-hover:opacity-100 group-hover:shadow-glow-primary" />
+              <div className="absolute inset-0 z-0 scale-75 rounded-full bg-linear-to-r from-primary to-key opacity-0 transition-all duration-300 ease-out group-hover:scale-100 group-hover:opacity-100 group-hover:shadow-glow-primary" />
               <span className="relative z-10">{item.label}</span>
             </a>
           ))}
         </nav>
         <div className="flex items-center gap-2">
           <Link to="/login">
-            <Button size="sm" className="group bg-gradient-to-r from-primary to-key text-primary-foreground shadow-glow-primary">
+            <Button
+              size="sm"
+              className="group bg-linear-to-r from-primary to-key text-primary-foreground shadow-glow-primary"
+            >
               Sign in
               <ArrowRight className="transition group-hover:translate-x-0.5" />
             </Button>
@@ -116,7 +119,7 @@ function Nav() {
 
 function LogoMark() {
   return (
-    <div className="relative grid h-8 w-8 place-items-center rounded-xl bg-gradient-to-br from-primary to-key shadow-glow-primary">
+    <div className="relative grid h-8 w-8 place-items-center rounded-xl bg-linear-to-br from-primary to-key shadow-glow-primary">
       <Shield className="h-4 w-4 text-primary-foreground" />
     </div>
   );
@@ -132,21 +135,27 @@ function Hero() {
     hidden: { opacity: 0 },
     show: {
       opacity: 1,
-      transition: { staggerChildren: 0.1 }
-    }
+      transition: { staggerChildren: 0.1 },
+    },
   };
 
   const item = {
     hidden: { opacity: 0, y: 40 },
-    show: { opacity: 1, y: 0, transition: { duration: 0.8, ease: [0.22, 1, 0.36, 1] as const } }
+    show: { opacity: 1, y: 0, transition: { duration: 0.8, ease: [0.22, 1, 0.36, 1] as const } },
   };
 
   return (
     <section className="relative overflow-hidden">
       {/* Background ornaments */}
       <div className="pointer-events-none absolute inset-0 -z-10">
-        <motion.div style={{ y: y1 }} className="absolute -top-24 left-1/2 h-[520px] w-[820px] -translate-x-1/2 rounded-full bg-[radial-gradient(closest-side,oklch(0.585_0.176_256/0.25),transparent)] blur-2xl" />
-        <motion.div style={{ y: y2 }} className="absolute right-[-10%] top-40 h-[420px] w-[420px] rounded-full bg-[radial-gradient(closest-side,oklch(0.55_0.22_295/0.22),transparent)] blur-2xl" />
+        <motion.div
+          style={{ y: y1 }}
+          className="absolute -top-24 left-1/2 h-130 w-205 -translate-x-1/2 rounded-full bg-[radial-gradient(closest-side,oklch(0.585_0.176_256/0.25),transparent)] blur-2xl"
+        />
+        <motion.div
+          style={{ y: y2 }}
+          className="absolute right-[-10%] top-40 h-105 w-105 rounded-full bg-[radial-gradient(closest-side,oklch(0.55_0.22_295/0.22),transparent)] blur-2xl"
+        />
         <div
           className="absolute inset-0 opacity-[0.35]"
           style={{
@@ -166,23 +175,33 @@ function Hero() {
               Zero-knowledge by design
             </span>
           </motion.div>
-          <motion.h1 variants={item} className="mt-6 text-4xl font-bold leading-[1.05] tracking-tight sm:text-5xl md:text-6xl">
+          <motion.h1
+            variants={item}
+            className="mt-6 text-4xl font-bold leading-[1.05] tracking-tight sm:text-5xl md:text-6xl"
+          >
             Send messages that{" "}
-            <span className="bg-gradient-to-r from-primary via-key to-primary bg-clip-text text-transparent">
+            <span className="bg-linear-to-r from-primary via-key to-primary bg-clip-text text-transparent">
               only they can read
             </span>{" "}
             🔐
           </motion.h1>
-          <motion.p variants={item} className="mt-5 max-w-xl text-base leading-relaxed text-muted-foreground sm:text-lg">
-            End-to-end encrypted messaging with complete privacy. Keys live in your
-            browser — no one, not even us, can access your data.
+          <motion.p
+            variants={item}
+            className="mt-5 max-w-xl text-base leading-relaxed text-muted-foreground sm:text-lg"
+          >
+            End-to-end encrypted messaging with complete privacy. Keys live in your browser — no
+            one, not even us, can access your data.
           </motion.p>
           <motion.div variants={item} className="mt-8 flex flex-col gap-3 sm:flex-row">
             <Link to="/">
-              <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} transition={{ type: "spring", stiffness: 400, damping: 17 }}>
+              <motion.div
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                transition={{ type: "spring", stiffness: 400, damping: 17 }}
+              >
                 <Button
                   size="lg"
-                  className="group h-12 w-full bg-gradient-to-r from-primary to-key px-6 text-primary-foreground shadow-[0_0_15px_rgba(var(--color-primary),0.3)] hover:shadow-[0_0_25px_rgba(var(--color-primary),0.6)] transition-shadow duration-300 sm:w-auto"
+                  className="group h-12 w-full bg-linear-to-r from-primary to-key px-6 text-primary-foreground shadow-[0_0_15px_rgba(var(--color-primary),0.3)] hover:shadow-[0_0_25px_rgba(var(--color-primary),0.6)] transition-shadow duration-300 sm:w-auto"
                 >
                   Send Secure Message
                   <ArrowRight className="transition group-hover:translate-x-0.5" />
@@ -190,7 +209,11 @@ function Hero() {
               </motion.div>
             </Link>
             <a href="#demo" className="sm:w-auto">
-              <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} transition={{ type: "spring", stiffness: 400, damping: 17 }}>
+              <motion.div
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                transition={{ type: "spring", stiffness: 400, damping: 17 }}
+              >
                 <Button variant="outline" size="lg" className="h-12 w-full px-6 sm:w-auto">
                   Try Demo
                 </Button>
@@ -198,7 +221,10 @@ function Hero() {
             </a>
           </motion.div>
 
-          <motion.div variants={item} className="mt-8 flex items-center gap-5 text-xs text-muted-foreground">
+          <motion.div
+            variants={item}
+            className="mt-8 flex items-center gap-5 text-xs text-muted-foreground"
+          >
             <Pill icon={<Lock className="h-3.5 w-3.5" />}>AES-256 + RSA-2048</Pill>
             <Pill icon={<Eye className="h-3.5 w-3.5" />}>View-once</Pill>
             <Pill icon={<Timer className="h-3.5 w-3.5" />}>Self-destruct</Pill>
@@ -225,7 +251,7 @@ function Pill({ icon, children }: { icon: React.ReactNode; children: React.React
 function HeroMock() {
   return (
     <div className="relative mx-auto w-full max-w-md animate-slide-up">
-      <div className="absolute -inset-4 -z-10 rounded-[2rem] bg-gradient-to-br from-primary/20 to-key/20 blur-2xl" />
+      <div className="absolute -inset-4 -z-10 rounded-[2rem] bg-linear-to-br from-primary/20 to-key/20 blur-2xl" />
       <div className="relative overflow-hidden rounded-3xl border border-border bg-card shadow-floating">
         <div className="flex items-center justify-between border-b border-border bg-surface-muted px-4 py-3">
           <div className="flex items-center gap-2">
@@ -250,7 +276,7 @@ function HeroMock() {
           </div>
 
           <div className="flex items-start justify-end gap-3">
-            <div className="rounded-2xl rounded-tr-sm bg-gradient-to-br from-primary to-key px-3.5 py-2.5 text-sm text-primary-foreground shadow-elegant">
+            <div className="rounded-2xl rounded-tr-sm bg-linear-to-br from-primary to-key px-3.5 py-2.5 text-sm text-primary-foreground shadow-elegant">
               Use the secure link below 👇
             </div>
             <div className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-key-soft text-xs font-semibold text-key">
@@ -342,8 +368,8 @@ function Features() {
     hidden: { opacity: 0 },
     show: {
       opacity: 1,
-      transition: { staggerChildren: 0.1 }
-    }
+      transition: { staggerChildren: 0.1 },
+    },
   };
 
   return (
@@ -391,12 +417,20 @@ function FeatureCard({
   };
   const item = {
     hidden: { opacity: 0, y: 50, scale: 0.95 },
-    show: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.6, ease: [0.22, 1, 0.36, 1] as const } }
+    show: {
+      opacity: 1,
+      y: 0,
+      scale: 1,
+      transition: { duration: 0.6, ease: [0.22, 1, 0.36, 1] as const },
+    },
   };
 
   return (
-    <motion.div variants={item} className="group relative overflow-hidden rounded-2xl border border-border bg-card p-6 shadow-elegant transition duration-300 hover:-translate-y-1 hover:shadow-floating">
-      <div className="pointer-events-none absolute inset-x-0 -top-px h-px bg-gradient-to-r from-transparent via-primary/40 to-transparent opacity-0 transition group-hover:opacity-100" />
+    <motion.div
+      variants={item}
+      className="group relative overflow-hidden rounded-2xl border border-border bg-card p-6 shadow-elegant transition duration-300 hover:-translate-y-1 hover:shadow-floating"
+    >
+      <div className="pointer-events-none absolute inset-x-0 -top-px h-px bg-linear-to-r from-transparent via-primary/40 to-transparent opacity-0 transition group-hover:opacity-100" />
       <div className={`grid h-11 w-11 place-items-center rounded-xl ${toneMap[tone]}`}>
         <Icon className="h-5 w-5" />
       </div>
@@ -442,7 +476,7 @@ function HowItWorks() {
             whileInView={{ scaleX: 1 }}
             viewport={{ once: true, margin: "-100px" }}
             transition={{ duration: 1, ease: "easeInOut", delay: 0.2 }}
-            className="absolute left-0 right-0 top-[68px] hidden h-px origin-left bg-gradient-to-r from-transparent via-border to-transparent md:block"
+            className="absolute left-0 right-0 top-17 hidden h-px origin-left bg-linear-to-r from-transparent via-border to-transparent md:block"
           />
           {steps.map((s, i) => (
             <motion.div
@@ -455,7 +489,7 @@ function HowItWorks() {
             >
               <div className="relative rounded-2xl border border-border bg-card p-6 shadow-elegant transition hover:-translate-y-0.5 hover:shadow-floating h-full">
                 <div className="flex items-center gap-3">
-                  <div className="grid h-12 w-12 place-items-center rounded-2xl bg-gradient-to-br from-primary to-key text-primary-foreground shadow-glow-primary">
+                  <div className="grid h-12 w-12 place-items-center rounded-2xl bg-linear-to-br from-primary to-key text-primary-foreground shadow-glow-primary">
                     <s.icon className="h-5 w-5" />
                   </div>
                   <span className="font-mono text-xs font-semibold text-muted-foreground">
@@ -480,7 +514,9 @@ function Demo() {
 
   const fakeCipher =
     "U2FsdGVkX1+kQp9w8nXz7r·" +
-    btoa(unescape(encodeURIComponent(msg))).replace(/=+$/, "").slice(0, 56) +
+    btoa(unescape(encodeURIComponent(msg)))
+      .replace(/=+$/, "")
+      .slice(0, 56) +
     "·rsa:wrapped";
 
   return (
@@ -517,7 +553,7 @@ function Demo() {
               <div className="mt-4 flex flex-wrap gap-2">
                 <Button
                   onClick={() => setStage("encrypted")}
-                  className="bg-gradient-to-r from-primary to-key text-primary-foreground"
+                  className="bg-linear-to-r from-primary to-key text-primary-foreground"
                 >
                   <Lock />
                   Encrypt
@@ -544,11 +580,9 @@ function Demo() {
               <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 {stage === "decrypted" ? "Decrypted" : "Encrypted preview"}
               </label>
-              <div className="mt-3 min-h-[160px] rounded-2xl border border-border bg-card p-4">
+              <div className="mt-3 min-h-40 rounded-2xl border border-border bg-card p-4">
                 {stage === "idle" && (
-                  <p className="font-mono text-xs text-muted-foreground">
-                    Waiting for encryption…
-                  </p>
+                  <p className="font-mono text-xs text-muted-foreground">Waiting for encryption…</p>
                 )}
                 {stage === "encrypted" && (
                   <p className="break-all font-mono text-xs leading-relaxed text-foreground animate-fade-in">
@@ -556,9 +590,7 @@ function Demo() {
                   </p>
                 )}
                 {stage === "decrypted" && (
-                  <p className="text-sm leading-relaxed text-foreground animate-fade-in">
-                    {msg}
-                  </p>
+                  <p className="text-sm leading-relaxed text-foreground animate-fade-in">{msg}</p>
                 )}
               </div>
               <div className="mt-4 flex items-center gap-2 text-xs text-muted-foreground">
@@ -599,13 +631,13 @@ function Security() {
             </span>
             <h2 className="mt-5 text-3xl font-bold tracking-tight sm:text-4xl">
               Your privacy is our{" "}
-              <span className="bg-gradient-to-r from-primary to-key bg-clip-text text-transparent">
+              <span className="bg-linear-to-r from-primary to-key bg-clip-text text-transparent">
                 only priority
               </span>
             </h2>
             <p className="mt-4 max-w-xl text-base leading-relaxed text-muted-foreground">
-              We built SecureSend so that even we can't read your messages. The math
-              guarantees it — not our policy.
+              We built SecureSend so that even we can't read your messages. The math guarantees it —
+              not our policy.
             </p>
             <ul className="mt-8 grid gap-3 sm:grid-cols-2">
               {points.map((p, i) => (
@@ -631,12 +663,12 @@ function Security() {
             transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] as const }}
             className="relative"
           >
-            <div className="absolute -inset-6 -z-10 rounded-[2rem] bg-gradient-to-br from-primary/15 via-key/15 to-transparent blur-2xl" />
+            <div className="absolute -inset-6 -z-10 rounded-[2rem] bg-linear-to-br from-primary/15 via-key/15 to-transparent blur-2xl" />
             <div className="relative mx-auto aspect-square w-full max-w-md rounded-[2rem] border border-border bg-card p-10 shadow-floating">
               <div className="grid h-full place-items-center">
                 <div className="relative">
                   <div className="absolute inset-0 -z-10 animate-glow-pulse rounded-full" />
-                  <div className="grid h-40 w-40 place-items-center rounded-full bg-gradient-to-br from-primary to-key shadow-glow-primary">
+                  <div className="grid h-40 w-40 place-items-center rounded-full bg-linear-to-br from-primary to-key shadow-glow-primary">
                     <Lock className="h-16 w-16 text-primary-foreground" />
                   </div>
                 </div>
@@ -655,9 +687,7 @@ function Security() {
 }
 
 function Badge({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="rounded-lg border border-border bg-surface-muted py-2">{children}</div>
-  );
+  return <div className="rounded-lg border border-border bg-surface-muted py-2">{children}</div>;
 }
 
 /* ---------------- CTA ---------------- */
@@ -669,9 +699,15 @@ function CTA() {
         whileInView={{ opacity: 1, y: 0, scale: 1 }}
         viewport={{ once: true, margin: "-100px" }}
         transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] as const }}
-        className="relative mx-auto max-w-5xl overflow-hidden rounded-3xl border border-border bg-gradient-to-br from-primary to-key p-10 text-center shadow-floating sm:p-16"
+        className="relative mx-auto max-w-5xl overflow-hidden rounded-3xl border border-border bg-linear-to-br from-primary to-key p-10 text-center shadow-floating sm:p-16"
       >
-        <div className="pointer-events-none absolute inset-0 opacity-30 [background-image:radial-gradient(circle_at_30%_20%,white,transparent_40%),radial-gradient(circle_at_70%_80%,white,transparent_40%)]" />
+        <div
+          className="pointer-events-none absolute inset-0 opacity-30"
+          style={{
+            backgroundImage:
+              "radial-gradient(circle at 30% 20%, white, transparent 40%), radial-gradient(circle at 70% 80%, white, transparent 40%)",
+          }}
+        />
         <h2 className="relative text-3xl font-bold tracking-tight text-primary-foreground sm:text-4xl">
           Ready to send your first secret?
         </h2>
@@ -680,7 +716,11 @@ function CTA() {
         </p>
         <div className="relative mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
           <Link to="/">
-            <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} transition={{ type: "spring", stiffness: 400, damping: 17 }}>
+            <motion.div
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              transition={{ type: "spring", stiffness: 400, damping: 17 }}
+            >
               <Button size="lg" variant="secondary" className="h-12 px-6">
                 Open the app
                 <ArrowRight />
@@ -688,7 +728,11 @@ function CTA() {
             </motion.div>
           </Link>
           <Link to="/signup">
-            <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} transition={{ type: "spring", stiffness: 400, damping: 17 }}>
+            <motion.div
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              transition={{ type: "spring", stiffness: 400, damping: 17 }}
+            >
               <Button
                 size="lg"
                 variant="outline"
@@ -715,8 +759,8 @@ function Footer() {
             <span className="text-base font-semibold tracking-tight">SecureSend</span>
           </div>
           <p className="mt-3 max-w-sm text-sm text-muted-foreground">
-            Universal secure communication. Encrypted in your browser. Trusted by people
-            who care about privacy.
+            Universal secure communication. Encrypted in your browser. Trusted by people who care
+            about privacy.
           </p>
           <div className="mt-5 flex items-center gap-2">
             <SocialLink href="#" label="Twitter">
@@ -780,13 +824,7 @@ function SocialLink({
   );
 }
 
-function FooterCol({
-  title,
-  links,
-}: {
-  title: string;
-  links: { label: string; href: string }[];
-}) {
+function FooterCol({ title, links }: { title: string; links: { label: string; href: string }[] }) {
   return (
     <div>
       <h4 className="text-sm font-semibold tracking-tight">{title}</h4>

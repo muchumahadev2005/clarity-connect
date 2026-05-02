@@ -19,6 +19,7 @@ import {
   Copy,
   Check,
   Download,
+  Upload,
 } from "lucide-react";
 import api from "@/lib/api";
 import type { MessageType, ProtectionMode } from "./types";
@@ -56,6 +57,7 @@ interface Props {
     link: string;
     sendMode: "link" | "direct";
     recipient: string | null;
+    attachmentName?: string;
     encrypted: EncryptedPayload;
   }) => void;
 }
@@ -69,6 +71,7 @@ const expiries = [
 ];
 
 const MAX_VOICE_SIZE_BYTES = 50 * 1024 * 1024;
+const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024;
 
 export function ComposeModal({ open, onClose, onEncrypt }: Props) {
   const [tab, setTab] = useState<MessageType>("text");
@@ -79,8 +82,41 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
   const [viewOnce, setViewOnce] = useState(false);
   const [recording, setRecording] = useState(false);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
+  const [audioFileName, setAudioFileName] = useState<string | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
+  const audioUploadInputRef = useRef<HTMLInputElement | null>(null);
+
+  const isMp3File = (file: File) => {
+    const lowerName = file.name.toLowerCase();
+    const validType = file.type === "audio/mpeg" || file.type === "audio/mp3" || file.type === "";
+    return lowerName.endsWith(".mp3") && validType;
+  };
+
+  const handleMp3Upload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!isMp3File(file)) {
+      setAudioBlob(null);
+      setAudioFileName(null);
+      toast.error("Only MP3 files are supported for upload.");
+      e.target.value = "";
+      return;
+    }
+
+    if (file.size > MAX_VOICE_SIZE_BYTES) {
+      setAudioBlob(null);
+      setAudioFileName(null);
+      toast.error("Audio is too large. Maximum allowed size is 50 MB.");
+      e.target.value = "";
+      return;
+    }
+
+    setAudioBlob(file);
+    setAudioFileName(file.name);
+    toast.success("MP3 ready to send securely");
+  };
 
   const toggleRecording = async () => {
     if (recording) {
@@ -101,11 +137,13 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
           const blob = new Blob(audioChunksRef.current, { type: "audio/webm" });
           if (blob.size > MAX_VOICE_SIZE_BYTES) {
             setAudioBlob(null);
+            setAudioFileName(null);
             toast.error("Audio is too large. Maximum allowed size is 50 MB.");
             stream.getTracks().forEach((track) => track.stop());
             return;
           }
           setAudioBlob(blob);
+          setAudioFileName(null);
           stream.getTracks().forEach((track) => track.stop());
         };
 
@@ -118,6 +156,7 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
     }
   };
   const [fileName, setFileName] = useState<string | null>(null);
+  const [fileToEncrypt, setFileToEncrypt] = useState<File | null>(null);
   const [sendMode, setSendMode] = useState<"link" | "direct">("link");
   const [recipient, setRecipient] = useState<string | null>(null);
   const [encStep, setEncStep] = useState(0); // 0 idle, 1-3 steps, 4 done
@@ -233,7 +272,10 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
     setExpiry(10);
     setViewOnce(false);
     setRecording(false);
+    setAudioBlob(null);
+    setAudioFileName(null);
     setFileName(null);
+    setFileToEncrypt(null);
     setSendMode("link");
     setRecipient(null);
     setEncStep(0);
@@ -243,9 +285,10 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
 
   const submit = async () => {
     let finalContent = text;
+    let attachmentName: string | undefined;
     if (tab === "voice") {
       if (!audioBlob) {
-        toast.error("Please record a message first");
+        toast.error("Please record audio or upload an MP3 file first");
         return;
       }
       if (audioBlob.size > MAX_VOICE_SIZE_BYTES) {
@@ -259,7 +302,27 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
       reader.readAsDataURL(audioBlob);
       finalContent = await base64Promise;
     } else if (tab === "file") {
-      finalContent = fileName ?? "attachment.bin";
+      if (!fileToEncrypt) {
+        toast.error("Please choose a file first");
+        return;
+      }
+      if (fileToEncrypt.size > MAX_FILE_SIZE_BYTES) {
+        toast.error("File is too large. Maximum allowed size is 50 MB.");
+        return;
+      }
+      attachmentName = fileToEncrypt.name;
+      const reader = new FileReader();
+      const base64Promise = new Promise<string>((resolve) => {
+        reader.onloadend = () => resolve(reader.result as string);
+      });
+      reader.readAsDataURL(fileToEncrypt);
+      const dataUrl = await base64Promise;
+      finalContent = JSON.stringify({
+        kind: "file",
+        name: fileToEncrypt.name,
+        mime: fileToEncrypt.type || "application/octet-stream",
+        dataUrl,
+      });
     }
 
     if (!finalContent.trim()) return;
@@ -273,7 +336,8 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
         return;
       }
     }
-    const link = `https://securesend.app/m/${Math.random().toString(36).slice(2, 10)}`;
+    const origin = typeof window !== "undefined" ? window.location.origin : (import.meta.env.VITE_APP_URL || "https://securesend.co.in");
+    const link = `${origin}/m/${Math.random().toString(36).slice(2, 10)}`;
     try {
       // Real hybrid encryption with Web Crypto API.
       setEncStep(1);
@@ -317,6 +381,7 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
         link,
         sendMode,
         recipient: protection === "hybrid" ? hybridReceiver.trim() : recipient,
+        attachmentName,
         encrypted,
       });
       reset();
@@ -426,9 +491,28 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
                 {recording
                   ? "Recording… tap to stop"
                   : audioBlob
-                    ? "Recording saved! Tap to re-record"
+                    ? audioFileName
+                      ? `Selected: ${audioFileName}`
+                      : "Recording saved! Tap to re-record"
                     : "Tap to record"}
               </p>
+              <div className="mt-4 flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => audioUploadInputRef.current?.click()}
+                  className="inline-flex items-center gap-2 rounded-full border border-border bg-surface px-3 py-1.5 text-xs font-medium text-foreground/80 transition hover:bg-secondary"
+                >
+                  <Upload className="h-3.5 w-3.5" /> Upload MP3
+                </button>
+                <input
+                  ref={audioUploadInputRef}
+                  type="file"
+                  accept=".mp3,audio/mpeg"
+                  className="hidden"
+                  onChange={handleMp3Upload}
+                />
+              </div>
+              <p className="mt-2 text-[11px] text-muted-foreground">Only MP3 files are supported</p>
               {audioBlob && !recording && (
                 <p className="mt-2 text-[10px] text-success font-medium">
                   ✓ Ready to send securely
@@ -453,11 +537,27 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
               <p className="mt-2 text-sm font-medium">
                 {fileName ?? "Click or drop a file to encrypt"}
               </p>
-              <p className="text-xs text-muted-foreground">Max 25 MB · Encrypted in your browser</p>
+              <p className="text-xs text-muted-foreground">Max 50 MB · Encrypted in your browser</p>
               <input
                 type="file"
                 className="hidden"
-                onChange={(e) => setFileName(e.target.files?.[0]?.name ?? null)}
+                onChange={(e) => {
+                  const selected = e.target.files?.[0] ?? null;
+                  if (!selected) {
+                    setFileName(null);
+                    setFileToEncrypt(null);
+                    return;
+                  }
+                  if (selected.size > MAX_FILE_SIZE_BYTES) {
+                    toast.error("File is too large. Maximum allowed size is 50 MB.");
+                    setFileName(null);
+                    setFileToEncrypt(null);
+                    e.target.value = "";
+                    return;
+                  }
+                  setFileName(selected.name);
+                  setFileToEncrypt(selected);
+                }}
               />
             </label>
           )}

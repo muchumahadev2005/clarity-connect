@@ -194,7 +194,7 @@ export function MessageDetail({ message, onDelete, onMarkViewed }: Props) {
       </div>
 
       {/* Security status bar */}
-      <div className="border-b border-border bg-gradient-to-r from-primary-soft/60 via-surface-muted to-surface-muted px-6 py-3">
+      <div className="border-b border-border bg-linear-to-r from-primary-soft/60 via-surface-muted to-surface-muted px-6 py-3">
         <div className="flex flex-wrap items-center gap-2">
           <StatusChip
             icon={ShieldCheck}
@@ -355,7 +355,7 @@ function HybridDecryptingScreen() {
     <div className="mx-auto flex max-w-md flex-col items-center text-center animate-scale-in">
       <div className="relative">
         <div className="absolute inset-0 rounded-full bg-primary/30 blur-2xl" />
-        <div className="relative flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-primary to-[oklch(0.65_0.18_290)] text-primary-foreground animate-glow-pulse">
+        <div className="relative flex h-20 w-20 items-center justify-center rounded-full bg-linear-to-br from-primary to-[oklch(0.65_0.18_290)] text-primary-foreground animate-glow-pulse">
           <Loader2 className="h-9 w-9 animate-spin" />
         </div>
       </div>
@@ -388,7 +388,7 @@ function LockScreen({
       <div className="relative">
         <div className="absolute inset-0 rounded-full bg-primary/30 blur-2xl" />
         <div
-          className={`relative flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-primary to-[oklch(0.65_0.18_240)] text-primary-foreground animate-glow-pulse ${
+          className={`relative flex h-20 w-20 items-center justify-center rounded-full bg-linear-to-br from-primary to-[oklch(0.65_0.18_240)] text-primary-foreground animate-glow-pulse ${
             decrypting ? "animate-unlock" : ""
           }`}
         >
@@ -470,6 +470,50 @@ function UnlockedBody({
     );
   }
 
+  const handleDownloadAttachment = async () => {
+    if (!unlocked || !decryptedBody) {
+      toast.error("Please decrypt the message before downloading.");
+      return;
+    }
+
+    let fileName = message.preview || "attachment.bin";
+    let dataUrl = decryptedBody;
+
+    // New format supports metadata (name/mime) while keeping backward compatibility.
+    if (decryptedBody.trim().startsWith("{")) {
+      try {
+        const parsed = JSON.parse(decryptedBody);
+        if (parsed && typeof parsed === "object") {
+          dataUrl = String(parsed.dataUrl || parsed.data || "");
+          fileName = String(parsed.name || parsed.fileName || fileName);
+        }
+      } catch {
+        // keep fallback values
+      }
+    }
+
+    if (!dataUrl.startsWith("data:")) {
+      toast.error("This attachment cannot be downloaded. Ask the sender to re-send the file.");
+      return;
+    }
+
+    try {
+      const response = await fetch(dataUrl);
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast.success("File decrypted and downloaded.");
+    } catch {
+      toast.error("Could not download the file. Please try again.");
+    }
+  };
+
   return (
     <div className={`space-y-5 ${message.stealth ? "animate-blur-in" : "animate-fade-in"}`}>
       {message.type === "voice" && (
@@ -486,14 +530,19 @@ function UnlockedBody({
               <p className="text-xs text-muted-foreground">Encrypted attachment</p>
             </div>
           </div>
-          <button className="inline-flex items-center gap-2 rounded-full bg-primary px-3.5 py-2 text-xs font-medium text-primary-foreground transition-all hover:opacity-95 active:scale-95">
+            <button
+              onClick={handleDownloadAttachment}
+              className="inline-flex items-center gap-2 rounded-full bg-primary px-3.5 py-2 text-xs font-medium text-primary-foreground transition-all hover:opacity-95 active:scale-95"
+            >
             <Download className="h-3.5 w-3.5" /> Decrypt & download
           </button>
         </div>
       )}
-      <p className="whitespace-pre-wrap text-[15px] leading-relaxed text-foreground">
-        {unlocked ? (decryptedBody || "[Message is empty]") : message.content}
-      </p>
+        {message.type !== "file" && (
+          <p className="whitespace-pre-wrap text-[15px] leading-relaxed text-foreground">
+            {unlocked ? (decryptedBody || "[Message is empty]") : message.content}
+          </p>
+        )}
       {message.viewOnce && (
         <div className="flex items-start gap-2 rounded-xl border border-warning/40 bg-warning-soft px-4 py-3 text-xs text-warning-foreground">
           <Eye className="mt-0.5 h-4 w-4 shrink-0" />

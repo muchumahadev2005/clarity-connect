@@ -128,7 +128,9 @@ function SecureSendApp() {
 
   const filtered = useMemo(() => {
     let list = messages.filter((m) => {
-      if (folder === "expired") return m.status === "expired";
+      // Changed: Don't separate expired messages to different folder
+      // They stay in inbox/sent and show "Expired" badge
+      // Only show truly deleted messages out of the list
       return m.folder === folder;
     });
 
@@ -271,8 +273,13 @@ function SecureSendApp() {
               folder: "sent",
               sender:
                 p.sendMode === "direct" && p.recipient ? `You → ${p.recipient}` : "You → recipient",
-              preview: p.type === "text" ? p.content.slice(0, 60) : p.content,
-              content: p.content,
+              preview:
+                p.type === "text"
+                  ? p.content.slice(0, 60)
+                  : p.type === "file"
+                    ? p.attachmentName || "Encrypted file"
+                    : p.content,
+              content: p.type === "file" ? p.attachmentName || "Encrypted file" : p.content,
               type: p.type,
               protection: p.protection,
               password: p.password,

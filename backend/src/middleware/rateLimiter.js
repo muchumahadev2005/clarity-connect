@@ -43,9 +43,21 @@ const generalApiLimiter = createLimiter(
   'Too many API requests. Please slow down.'
 );
 
+/**
+ * Rate limiter for sending anonymous emails
+ * Limits to 10 requests per minute per IP
+ * Prevents email flooding/spam
+ */
+const sendAnonymousEmailLimiter = createLimiter(
+  60 * 1000,      // 1 minute
+  10,             // 10 requests per minute
+  'Too many email send requests. Please try again in 1 minute.'
+);
+
 module.exports = {
   createLimiter,
   authLimiter,
   messageLimiter,
-  generalApiLimiter
+  generalApiLimiter,
+  sendAnonymousEmailLimiter,
 };

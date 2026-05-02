@@ -5,6 +5,29 @@ const jwt = require('jsonwebtoken');
 
 const generateOtp = () => Math.floor(100000 + Math.random() * 900000).toString();
 
+const getPasswordRequirements = (password = '') => {
+  return {
+    minLength: password.length >= 12,
+    uppercase: /[A-Z]/.test(password),
+    lowercase: /[a-z]/.test(password),
+    number: /[0-9]/.test(password),
+    symbol: /[@#$%]/.test(password),
+  };
+};
+
+const getPasswordMissingList = (password = '') => {
+  const checks = getPasswordRequirements(password);
+  const missing = [];
+
+  if (!checks.minLength) missing.push('Minimum 12 characters');
+  if (!checks.uppercase) missing.push('Uppercase letter (A-Z)');
+  if (!checks.lowercase) missing.push('Lowercase letter (a-z)');
+  if (!checks.number) missing.push('Number (0-9)');
+  if (!checks.symbol) missing.push('Symbol (@ # $ %)');
+
+  return missing;
+};
+
 // 1. Request OTP for Signup
 exports.requestSignupOtp = async (req, res, next) => {
   try {
@@ -57,6 +80,19 @@ exports.verifyOtp = async (req, res, next) => {
 exports.signup = async (req, res, next) => {
   try {
     const { email, password } = req.body;
+
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({ success: false, message: 'User already exists' });
+    }
+
+    const missingRequirements = getPasswordMissingList(password);
+    if (missingRequirements.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: `Password is missing: ${missingRequirements.join(', ')}`,
+      });
+    }
     
     const newUser = new User({ email, passwordHash: password });
     await newUser.save();
@@ -118,6 +154,14 @@ exports.requestPasswordResetOtp = async (req, res, next) => {
 exports.resetPassword = async (req, res, next) => {
   try {
     const { email, otp, newPassword } = req.body;
+
+    const missingRequirements = getPasswordMissingList(newPassword);
+    if (missingRequirements.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: `Password is missing: ${missingRequirements.join(', ')}`,
+      });
+    }
     
     const otpRecord = await OTP.findOne({ email, otp });
     if (!otpRecord) {

@@ -22,5 +22,6 @@ export function formatCountdown(ms: number) {
 
 export function generateLink() {
   const id = Math.random().toString(36).slice(2, 10);
-  return `https://securesend.app/m/${id}`;
+  const origin = typeof window !== "undefined" ? window.location.origin : (import.meta.env.VITE_APP_URL || "https://securesend.co.in");
+  return `${origin}/m/${id}`;
 }

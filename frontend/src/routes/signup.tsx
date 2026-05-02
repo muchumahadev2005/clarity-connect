@@ -1,7 +1,25 @@
 import { createFileRoute, useNavigate, redirect, Link } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type ClipboardEvent } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type ClipboardEvent,
+} from "react";
 import { Toaster, toast } from "sonner";
-import { ShieldCheck, Mail, KeyRound, Loader2, CheckCircle2, ArrowLeft, Timer } from "lucide-react";
+import {
+  ShieldCheck,
+  Mail,
+  KeyRound,
+  Loader2,
+  CheckCircle2,
+  ArrowLeft,
+  Timer,
+  Circle,
+  Eye,
+  EyeOff,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import api from "@/lib/api";
 
@@ -14,7 +32,10 @@ export const Route = createFileRoute("/signup")({
   head: () => ({
     meta: [
       { title: "Sign up — SecureSend" },
-      { name: "description", content: "Sign up for SecureSend with a one-time code sent to your email." },
+      {
+        name: "description",
+        content: "Sign up for SecureSend with a one-time code sent to your email.",
+      },
       { property: "og:title", content: "Sign up — SecureSend" },
       { property: "og:description", content: "Email OTP signup for secure, encrypted messaging." },
     ],
@@ -41,19 +62,44 @@ function SignupPage() {
   const [otp, setOtp] = useState<string[]>(["", "", "", "", "", ""]);
   const [otpError, setOtpError] = useState<string | null>(null);
   const [resendIn, setResendIn] = useState(0);
-  
+
   // Password state
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
-  
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
   const inputsRef = useRef<Array<HTMLInputElement | null>>([]);
 
-  const emailValid = useMemo(
-    () => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()),
-    [email],
+  const emailValid = useMemo(() => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()), [email]);
+
+  const passwordChecks = useMemo(
+    () => ({
+      minLength: password.length >= 12,
+      uppercase: /[A-Z]/.test(password),
+      lowercase: /[a-z]/.test(password),
+      number: /[0-9]/.test(password),
+      symbol: /[@#$%]/.test(password),
+    }),
+    [password],
   );
+
+  const missingPasswordRules = useMemo(() => {
+    const missing: string[] = [];
+    if (!passwordChecks.minLength) missing.push("Minimum: 12 characters");
+    if (!passwordChecks.uppercase) missing.push("Uppercase (A-Z)");
+    if (!passwordChecks.lowercase) missing.push("Lowercase (a-z)");
+    if (!passwordChecks.number) missing.push("Numbers (0-9)");
+    if (!passwordChecks.symbol) missing.push("Symbols (@ # $ %)");
+    return missing;
+  }, [passwordChecks]);
+
+  const passwordStrong = missingPasswordRules.length === 0;
+  const passwordMatch = password === confirmPassword;
+  const canCreateAccount =
+    passwordStrong && passwordMatch && password.length > 0 && confirmPassword.length > 0;
 
   useEffect(() => {
     if (resendIn <= 0) return;
@@ -149,11 +195,11 @@ function SignupPage() {
   };
 
   const handleCreateAccount = async () => {
-    if (password.length < 6) {
-      setPasswordError("Password must be at least 6 characters.");
+    if (!passwordStrong) {
+      setPasswordError(`Password is missing: ${missingPasswordRules.join(", ")}.`);
       return;
     }
-    if (password !== confirmPassword) {
+    if (!passwordMatch) {
       setPasswordError("Passwords do not match.");
       return;
     }
@@ -164,8 +210,10 @@ function SignupPage() {
         email: email.trim(),
         password,
       });
-      
+
+      // Store token and authenticated user's email
       localStorage.setItem("token", res.data.token);
+      localStorage.setItem("userEmail", res.data.user?.email || email.trim());
       localStorage.setItem("isLoggedIn", "true");
       setStep("success");
       setTimeout(() => navigate({ to: "/" }), 1400);
@@ -181,8 +229,8 @@ function SignupPage() {
       <Toaster position="top-center" richColors />
       {/* Decorative background */}
       <div className="pointer-events-none absolute inset-0 -z-10">
-        <div className="absolute -top-32 left-1/2 h-[480px] w-[480px] -translate-x-1/2 rounded-full bg-primary/10 blur-3xl" />
-        <div className="absolute bottom-0 right-0 h-[320px] w-[320px] rounded-full bg-primary/5 blur-3xl" />
+        <div className="absolute -top-32 left-1/2 h-120 w-120 -translate-x-1/2 rounded-full bg-primary/10 blur-3xl" />
+        <div className="absolute bottom-0 right-0 h-80 w-80 rounded-full bg-primary/5 blur-3xl" />
       </div>
 
       <div className="mx-auto flex min-h-screen w-full max-w-md flex-col items-center justify-center px-4 py-10">
@@ -208,7 +256,10 @@ function SignupPage() {
                 <p className="mt-1 text-sm text-muted-foreground">Enter your email to sign up</p>
               </div>
 
-              <label htmlFor="email" className="mb-1.5 block text-xs font-medium text-muted-foreground">
+              <label
+                htmlFor="email"
+                className="mb-1.5 block text-xs font-medium text-muted-foreground"
+              >
                 Email address
               </label>
               <input
@@ -225,7 +276,9 @@ function SignupPage() {
                 className={cn(
                   "w-full rounded-xl border bg-background px-4 py-3 text-sm outline-none transition-all",
                   "focus:ring-2 focus:ring-primary/30 focus:border-primary",
-                  emailError ? "border-destructive focus:ring-destructive/30 focus:border-destructive" : "border-border",
+                  emailError
+                    ? "border-destructive focus:ring-destructive/30 focus:border-destructive"
+                    : "border-border",
                 )}
               />
               {emailError && (
@@ -253,7 +306,10 @@ function SignupPage() {
 
               <div className="mt-6 text-center text-sm text-muted-foreground">
                 Already have an account?{" "}
-                <Link to="/login" className="font-semibold text-primary hover:underline transition-colors">
+                <Link
+                  to="/login"
+                  className="font-semibold text-primary hover:underline transition-colors"
+                >
                   Sign in
                 </Link>
               </div>
@@ -309,7 +365,9 @@ function SignupPage() {
                 ))}
               </div>
               {otpError && (
-                <p className="mt-3 text-center text-xs text-destructive animate-fade-in">{otpError}</p>
+                <p className="mt-3 text-center text-xs text-destructive animate-fade-in">
+                  {otpError}
+                </p>
               )}
 
               <button
@@ -361,60 +419,128 @@ function SignupPage() {
               </div>
 
               <div className="space-y-4">
-                <div>
-                  <label htmlFor="password" className="mb-1.5 block text-xs font-medium text-muted-foreground">
-                    Password
-                  </label>
-                  <input
-                    id="password"
-                    type="password"
-                    autoComplete="new-password"
-                    placeholder="••••••••"
-                    value={password}
-                    onChange={(e) => {
-                      setPassword(e.target.value);
-                      if (passwordError) setPasswordError(null);
-                    }}
-                    onKeyDown={(e) => e.key === "Enter" && handleCreateAccount()}
-                    className={cn(
-                      "w-full rounded-xl border bg-background px-4 py-3 text-sm outline-none transition-all",
-                      "focus:ring-2 focus:ring-primary/30 focus:border-primary",
-                      passwordError?.includes("at least 6") ? "border-destructive focus:ring-destructive/30 focus:border-destructive" : "border-border",
-                    )}
-                  />
+                <div className="rounded-xl border border-border bg-surface-muted px-3.5 py-3">
+                  <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    Password must include
+                  </p>
+                  <div className="space-y-1.5 text-xs">
+                    {[
+                      { ok: passwordChecks.minLength, label: "Minimum: 12 characters" },
+                      { ok: passwordChecks.uppercase, label: "Uppercase (A-Z)" },
+                      { ok: passwordChecks.lowercase, label: "Lowercase (a-z)" },
+                      { ok: passwordChecks.number, label: "Numbers (0-9)" },
+                      { ok: passwordChecks.symbol, label: "Symbols (@ # $ %)" },
+                    ].map((rule) => (
+                      <p
+                        key={rule.label}
+                        className={cn(
+                          "flex items-center gap-2",
+                          rule.ok ? "text-success" : "text-muted-foreground",
+                        )}
+                      >
+                        {rule.ok ? (
+                          <CheckCircle2 className="h-3.5 w-3.5" />
+                        ) : (
+                          <Circle className="h-3.5 w-3.5" />
+                        )}{" "}
+                        {rule.label}
+                      </p>
+                    ))}
+                  </div>
                 </div>
 
                 <div>
-                  <label htmlFor="confirmPassword" className="mb-1.5 block text-xs font-medium text-muted-foreground">
+                  <label
+                    htmlFor="password"
+                    className="mb-1.5 block text-xs font-medium text-muted-foreground"
+                  >
+                    Password
+                  </label>
+                  <div className="relative">
+                    <input
+                      id="password"
+                      type={showPassword ? "text" : "password"}
+                      autoComplete="new-password"
+                      placeholder="••••••••"
+                      value={password}
+                      onChange={(e) => {
+                        setPassword(e.target.value);
+                        if (passwordError) setPasswordError(null);
+                      }}
+                      onKeyDown={(e) => e.key === "Enter" && handleCreateAccount()}
+                      className={cn(
+                        "w-full rounded-xl border bg-background px-4 py-3 pr-12 text-sm outline-none transition-all",
+                        "focus:ring-2 focus:ring-primary/30 focus:border-primary",
+                        passwordError?.includes("Password is missing")
+                          ? "border-destructive focus:ring-destructive/30 focus:border-destructive"
+                          : "border-border",
+                      )}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword((v) => !v)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-1 text-muted-foreground transition hover:bg-secondary hover:text-foreground"
+                      aria-label={showPassword ? "Hide password" : "Show password"}
+                    >
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="confirmPassword"
+                    className="mb-1.5 block text-xs font-medium text-muted-foreground"
+                  >
                     Confirm Password
                   </label>
-                  <input
-                    id="confirmPassword"
-                    type="password"
-                    autoComplete="new-password"
-                    placeholder="••••••••"
-                    value={confirmPassword}
-                    onChange={(e) => {
-                      setConfirmPassword(e.target.value);
-                      if (passwordError) setPasswordError(null);
-                    }}
-                    onKeyDown={(e) => e.key === "Enter" && handleCreateAccount()}
-                    className={cn(
-                      "w-full rounded-xl border bg-background px-4 py-3 text-sm outline-none transition-all",
-                      "focus:ring-2 focus:ring-primary/30 focus:border-primary",
-                      passwordError?.includes("match") ? "border-destructive focus:ring-destructive/30 focus:border-destructive" : "border-border",
-                    )}
-                  />
+                  <div className="relative">
+                    <input
+                      id="confirmPassword"
+                      type={showConfirmPassword ? "text" : "password"}
+                      autoComplete="new-password"
+                      placeholder="••••••••"
+                      value={confirmPassword}
+                      onChange={(e) => {
+                        setConfirmPassword(e.target.value);
+                        if (passwordError) setPasswordError(null);
+                      }}
+                      onKeyDown={(e) => e.key === "Enter" && handleCreateAccount()}
+                      className={cn(
+                        "w-full rounded-xl border bg-background px-4 py-3 pr-12 text-sm outline-none transition-all",
+                        "focus:ring-2 focus:ring-primary/30 focus:border-primary",
+                        !passwordMatch && confirmPassword
+                          ? "border-destructive focus:ring-destructive/30 focus:border-destructive"
+                          : "border-border",
+                      )}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPassword((v) => !v)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-1 text-muted-foreground transition hover:bg-secondary hover:text-foreground"
+                      aria-label={
+                        showConfirmPassword ? "Hide confirm password" : "Show confirm password"
+                      }
+                    >
+                      {showConfirmPassword ? (
+                        <EyeOff className="h-4 w-4" />
+                      ) : (
+                        <Eye className="h-4 w-4" />
+                      )}
+                    </button>
+                  </div>
                 </div>
               </div>
 
               {passwordError && (
-                <p className="mt-4 text-center text-xs text-destructive animate-fade-in">{passwordError}</p>
+                <p className="mt-4 text-center text-xs text-destructive animate-fade-in">
+                  {passwordError}
+                </p>
               )}
 
               <button
                 onClick={handleCreateAccount}
-                disabled={creating || !password || !confirmPassword}
+                disabled={creating || !canCreateAccount}
                 className={cn(
                   "mt-6 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-medium text-primary-foreground shadow-elegant transition-all",
                   "hover:opacity-90 hover:-translate-y-0.5 active:translate-y-0",

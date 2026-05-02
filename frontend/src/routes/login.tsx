@@ -1,5 +1,12 @@
 import { createFileRoute, useNavigate, redirect, Link } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type ClipboardEvent } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type ClipboardEvent,
+} from "react";
 import { Toaster, toast } from "sonner";
 import { ShieldCheck, Mail, KeyRound, Loader2, CheckCircle2, ArrowLeft, Timer } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -14,7 +21,10 @@ export const Route = createFileRoute("/login")({
   head: () => ({
     meta: [
       { title: "Sign in — SecureSend" },
-      { name: "description", content: "Sign in to SecureSend with a one-time code sent to your email." },
+      {
+        name: "description",
+        content: "Sign in to SecureSend with a one-time code sent to your email.",
+      },
       { property: "og:title", content: "Sign in — SecureSend" },
       { property: "og:description", content: "Email OTP login for secure, encrypted messaging." },
     ],
@@ -41,13 +51,10 @@ function LoginPage() {
   const [verifying, setVerifying] = useState(false);
   const [otp, setOtp] = useState<string[]>(["", "", "", "", "", ""]);
   const [resendIn, setResendIn] = useState(0);
-  
+
   const inputsRef = useRef<Array<HTMLInputElement | null>>([]);
 
-  const emailValid = useMemo(
-    () => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()),
-    [email],
-  );
+  const emailValid = useMemo(() => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()), [email]);
 
   useEffect(() => {
     if (resendIn <= 0) return;
@@ -73,14 +80,16 @@ function LoginPage() {
     }
     setError(null);
     setVerifying(true);
-    
+
     try {
       const res = await api.post("/auth/login", {
         email: email.trim(),
         password,
       });
 
+      // Store token and authenticated user's email
       localStorage.setItem("token", res.data.token);
+      localStorage.setItem("userEmail", res.data.user?.email || email.trim());
       localStorage.setItem("isLoggedIn", "true");
       setStep("success");
       setTimeout(() => navigate({ to: "/" }), 1400);
@@ -189,8 +198,8 @@ function LoginPage() {
       <Toaster position="top-center" richColors />
       {/* Decorative background */}
       <div className="pointer-events-none absolute inset-0 -z-10">
-        <div className="absolute -top-32 left-1/2 h-[480px] w-[480px] -translate-x-1/2 rounded-full bg-primary/10 blur-3xl" />
-        <div className="absolute bottom-0 right-0 h-[320px] w-[320px] rounded-full bg-primary/5 blur-3xl" />
+        <div className="absolute -top-32 left-1/2 h-120 w-120 -translate-x-1/2 rounded-full bg-primary/10 blur-3xl" />
+        <div className="absolute bottom-0 right-0 h-80 w-80 rounded-full bg-primary/5 blur-3xl" />
       </div>
 
       <div className="mx-auto flex min-h-screen w-full max-w-md flex-col items-center justify-center px-4 py-10">
@@ -218,7 +227,10 @@ function LoginPage() {
 
               <div className="space-y-4">
                 <div>
-                  <label htmlFor="email" className="mb-1.5 block text-xs font-medium text-muted-foreground">
+                  <label
+                    htmlFor="email"
+                    className="mb-1.5 block text-xs font-medium text-muted-foreground"
+                  >
                     Email address
                   </label>
                   <input
@@ -235,7 +247,9 @@ function LoginPage() {
                     className={cn(
                       "w-full rounded-xl border bg-background px-4 py-3 text-sm outline-none transition-all",
                       "focus:ring-2 focus:ring-primary/30 focus:border-primary",
-                      error?.includes("email") ? "border-destructive focus:ring-destructive/30 focus:border-destructive" : "border-border",
+                      error?.includes("email")
+                        ? "border-destructive focus:ring-destructive/30 focus:border-destructive"
+                        : "border-border",
                     )}
                   />
                 </div>
@@ -245,7 +259,7 @@ function LoginPage() {
                     <label htmlFor="password" className="text-xs font-medium text-muted-foreground">
                       Password
                     </label>
-                    <button 
+                    <button
                       onClick={() => {
                         setStep("forgot-email");
                         setError(null);
@@ -269,7 +283,9 @@ function LoginPage() {
                     className={cn(
                       "w-full rounded-xl border bg-background px-4 py-3 text-sm outline-none transition-all",
                       "focus:ring-2 focus:ring-primary/30 focus:border-primary",
-                      error?.includes("Password") ? "border-destructive focus:ring-destructive/30 focus:border-destructive" : "border-border",
+                      error?.includes("Password")
+                        ? "border-destructive focus:ring-destructive/30 focus:border-destructive"
+                        : "border-border",
                     )}
                   />
                 </div>
@@ -300,7 +316,10 @@ function LoginPage() {
 
               <div className="mt-6 text-center text-sm text-muted-foreground">
                 Don't have an account?{" "}
-                <Link to="/signup" className="font-semibold text-primary hover:underline transition-colors">
+                <Link
+                  to="/signup"
+                  className="font-semibold text-primary hover:underline transition-colors"
+                >
                   Create new account
                 </Link>
               </div>
@@ -320,10 +339,15 @@ function LoginPage() {
                   <Mail className="h-6 w-6" />
                 </div>
                 <h1 className="text-2xl font-semibold tracking-tight">Reset password</h1>
-                <p className="mt-1 text-sm text-muted-foreground">Enter your email to receive a reset code</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Enter your email to receive a reset code
+                </p>
               </div>
 
-              <label htmlFor="reset-email" className="mb-1.5 block text-xs font-medium text-muted-foreground">
+              <label
+                htmlFor="reset-email"
+                className="mb-1.5 block text-xs font-medium text-muted-foreground"
+              >
                 Email address
               </label>
               <input
@@ -349,7 +373,11 @@ function LoginPage() {
                 disabled={verifying || !email}
                 className="mt-6 w-full rounded-xl bg-primary px-4 py-3 text-sm font-medium text-primary-foreground shadow-elegant transition-all hover:opacity-90 active:scale-[0.98] disabled:opacity-60"
               >
-                {verifying ? <Loader2 className="mx-auto h-4 w-4 animate-spin" /> : "Send Reset Code"}
+                {verifying ? (
+                  <Loader2 className="mx-auto h-4 w-4 animate-spin" />
+                ) : (
+                  "Send Reset Code"
+                )}
               </button>
             </>
           )}
@@ -365,7 +393,8 @@ function LoginPage() {
               <div className="mb-6 text-center">
                 <h1 className="text-2xl font-semibold tracking-tight">Verify Reset Code</h1>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  We sent a code to <span className="font-medium text-foreground">{maskEmail(email)}</span>
+                  We sent a code to{" "}
+                  <span className="font-medium text-foreground">{maskEmail(email)}</span>
                 </p>
               </div>
 
@@ -373,7 +402,9 @@ function LoginPage() {
                 {otp.map((d, i) => (
                   <input
                     key={i}
-                    ref={(el) => { inputsRef.current[i] = el; }}
+                    ref={(el) => {
+                      inputsRef.current[i] = el;
+                    }}
                     inputMode="numeric"
                     maxLength={1}
                     value={d}
@@ -387,7 +418,9 @@ function LoginPage() {
                   />
                 ))}
               </div>
-              {error && <p className="mt-3 text-center text-xs text-destructive animate-fade-in">{error}</p>}
+              {error && (
+                <p className="mt-3 text-center text-xs text-destructive animate-fade-in">{error}</p>
+              )}
 
               <button
                 onClick={handleVerifyOtp}
@@ -422,14 +455,20 @@ function LoginPage() {
                   className="w-full rounded-xl border border-border bg-background px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
                 />
               </div>
-              {error && <p className="mt-4 text-center text-xs text-destructive animate-fade-in">{error}</p>}
+              {error && (
+                <p className="mt-4 text-center text-xs text-destructive animate-fade-in">{error}</p>
+              )}
 
               <button
                 onClick={handleResetPassword}
                 disabled={verifying || !password || !confirmPassword}
                 className="mt-6 w-full rounded-xl bg-primary px-4 py-3 text-sm font-medium text-primary-foreground shadow-elegant transition-all hover:opacity-90 disabled:opacity-60"
               >
-                {verifying ? <Loader2 className="mx-auto h-4 w-4 animate-spin" /> : "Reset Password"}
+                {verifying ? (
+                  <Loader2 className="mx-auto h-4 w-4 animate-spin" />
+                ) : (
+                  "Reset Password"
+                )}
               </button>
             </>
           )}
@@ -440,7 +479,9 @@ function LoginPage() {
                 <CheckCircle2 className="h-9 w-9" />
               </div>
               <h1 className="text-2xl font-semibold tracking-tight">Password Reset! 🎉</h1>
-              <p className="mt-1 text-sm text-muted-foreground">You can now sign in with your new password.</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                You can now sign in with your new password.
+              </p>
             </div>
           )}
 
