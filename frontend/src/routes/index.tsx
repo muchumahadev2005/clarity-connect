@@ -38,7 +38,7 @@ function SecureSendApp() {
         const [inRes, outRes, userRes] = await Promise.all([
           api.get("/messages/inbox"),
           api.get("/messages/outbox"),
-          api.get("/auth/me")
+          api.get("/auth/me"),
         ]);
 
         setUser(userRes.data.user);
@@ -46,9 +46,10 @@ function SecureSendApp() {
         const mapMsg = (m: any, folder: "inbox" | "sent") => ({
           id: m._id,
           folder,
-          sender: folder === "inbox" 
-            ? (m.senderId?.email || "Anonymous") 
-            : `You → ${m.receiverId?.email || "Link"}`,
+          sender:
+            folder === "inbox"
+              ? m.senderId?.email || "Anonymous"
+              : `You → ${m.receiverId?.email || "Link"}`,
           preview: m.type === "text" ? "Encrypted Message" : `Encrypted ${m.type}`,
           content: "[Secure Message Content]", // Placeholder until decrypted
           type: m.type,
@@ -112,7 +113,11 @@ function SecureSendApp() {
     open: boolean;
     link: string;
     summary: { protection: string; expiry: string; viewOnce: boolean };
-  }>({ open: false, link: "", summary: { protection: "Quick", expiry: "10 min", viewOnce: false } });
+  }>({
+    open: false,
+    link: "",
+    summary: { protection: "Quick", expiry: "10 min", viewOnce: false },
+  });
 
   const counts: Record<Folder, number> = {
     inbox: messages.filter((m) => m.folder === "inbox").length,
@@ -203,7 +208,7 @@ function SecureSendApp() {
           <>
             <div
               className={
-                "shrink-0 border-r border-border md:w-[400px] md:block " +
+                "shrink-0 border-r border-border md:w-100 md:block " +
                 (selectedId ? "hidden md:block" : "block w-full")
               }
             >
@@ -217,11 +222,7 @@ function SecureSendApp() {
                 onToggleSidebar={() => setCollapsed(!collapsed)}
               />
             </div>
-            <div
-              className={
-                "flex-1 overflow-hidden " + (selectedId ? "block" : "hidden md:block")
-              }
-            >
+            <div className={"flex-1 overflow-hidden " + (selectedId ? "block" : "hidden md:block")}>
               <div className="flex h-full flex-col">
                 {selectedId && (
                   <button
@@ -260,15 +261,16 @@ function SecureSendApp() {
               isAnonymous: p.sendMode === "link",
               viewOnce: p.viewOnce,
               expiresAt: p.expiry ? new Date(Date.now() + p.expiry * 60_000).toISOString() : null,
-              recipientEmail: p.recipient, 
+              recipientEmail: p.recipient,
             };
 
             const res = await api.post("/messages", messageData);
-            
+
             const newMsg: SecureMessage = {
               id: res.data.data._id || `new-${Date.now()}`,
               folder: "sent",
-              sender: p.sendMode === "direct" && p.recipient ? `You → ${p.recipient}` : "You → recipient",
+              sender:
+                p.sendMode === "direct" && p.recipient ? `You → ${p.recipient}` : "You → recipient",
               preview: p.type === "text" ? p.content.slice(0, 60) : p.content,
               content: p.content,
               type: p.type,
@@ -300,7 +302,12 @@ function SecureSendApp() {
                         : p.protection === "hybrid"
                           ? "Hybrid 🔐"
                           : "Quick",
-                  expiry: p.expiry < 1 ? "10 sec" : p.expiry < 60 ? `${p.expiry} min` : `${p.expiry / 60} hr`,
+                  expiry:
+                    p.expiry < 1
+                      ? "10 sec"
+                      : p.expiry < 60
+                        ? `${p.expiry} min`
+                        : `${p.expiry / 60} hr`,
                   viewOnce: p.viewOnce,
                 },
               });

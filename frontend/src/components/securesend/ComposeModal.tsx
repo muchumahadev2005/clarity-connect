@@ -68,6 +68,8 @@ const expiries = [
   { label: "1 day", value: 1440 },
 ];
 
+const MAX_VOICE_SIZE_BYTES = 50 * 1024 * 1024;
+
 export function ComposeModal({ open, onClose, onEncrypt }: Props) {
   const [tab, setTab] = useState<MessageType>("text");
   const [text, setText] = useState("");
@@ -96,9 +98,15 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
         };
 
         recorder.onstop = () => {
-          const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+          const blob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+          if (blob.size > MAX_VOICE_SIZE_BYTES) {
+            setAudioBlob(null);
+            toast.error("Audio is too large. Maximum allowed size is 50 MB.");
+            stream.getTracks().forEach((track) => track.stop());
+            return;
+          }
           setAudioBlob(blob);
-          stream.getTracks().forEach(track => track.stop());
+          stream.getTracks().forEach((track) => track.stop());
         };
 
         recorder.start();
@@ -189,7 +197,12 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
 
   const downloadKey = () => {
     if (!password) return;
-    const blob = new Blob([`SecureSend Message Key\n\nKey: ${password}\n\nKeep this key safe. Anyone with this key can decrypt your message.`], { type: "text/plain" });
+    const blob = new Blob(
+      [
+        `SecureSend Message Key\n\nKey: ${password}\n\nKeep this key safe. Anyone with this key can decrypt your message.`,
+      ],
+      { type: "text/plain" },
+    );
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -233,6 +246,10 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
     if (tab === "voice") {
       if (!audioBlob) {
         toast.error("Please record a message first");
+        return;
+      }
+      if (audioBlob.size > MAX_VOICE_SIZE_BYTES) {
+        toast.error("Audio is too large. Maximum allowed size is 50 MB.");
         return;
       }
       const reader = new FileReader();
@@ -406,10 +423,16 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
                 {recording ? <Square className="h-6 w-6" /> : <Circle className="h-6 w-6" />}
               </button>
               <p className="mt-3 text-sm text-muted-foreground">
-                {recording ? "Recording… tap to stop" : audioBlob ? "Recording saved! Tap to re-record" : "Tap to record"}
+                {recording
+                  ? "Recording… tap to stop"
+                  : audioBlob
+                    ? "Recording saved! Tap to re-record"
+                    : "Tap to record"}
               </p>
               {audioBlob && !recording && (
-                <p className="mt-2 text-[10px] text-success font-medium">✓ Ready to send securely</p>
+                <p className="mt-2 text-[10px] text-success font-medium">
+                  ✓ Ready to send securely
+                </p>
               )}
               {recording && (
                 <div className="mt-4 flex h-8 items-center gap-0.5">
@@ -459,7 +482,7 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
                     "flex flex-col items-center gap-1 rounded-xl border px-3 py-3 text-xs transition",
                     protection === p.id
                       ? p.id === "hybrid"
-                        ? "border-primary bg-gradient-to-br from-primary-soft to-[oklch(0.92_0.07_290)] text-primary font-semibold shadow-[0_0_0_4px_oklch(var(--primary)/0.12)]"
+                        ? "border-primary bg-linear-to-br from-primary-soft to-[oklch(0.92_0.07_290)] text-primary font-semibold shadow-[0_0_0_4px_oklch(var(--primary)/0.12)]"
                         : "border-primary bg-primary-soft text-accent-foreground font-medium"
                       : "border-border hover:bg-secondary",
                   )}
@@ -471,7 +494,7 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
             </div>
             {protection === "hybrid" && (
               <div className="mt-3 space-y-3 animate-fade-in">
-                <div className="rounded-xl border border-primary/30 bg-gradient-to-br from-primary-soft/70 to-[oklch(0.95_0.05_290)] p-3.5">
+                <div className="rounded-xl border border-primary/30 bg-linear-to-br from-primary-soft/70 to-[oklch(0.95_0.05_290)] p-3.5">
                   <div className="flex items-center gap-2 text-xs font-semibold text-primary">
                     <ShieldCheck className="h-4 w-4" /> Hybrid Encryption Enabled
                   </div>
@@ -659,7 +682,7 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
               <span
                 className={cn(
                   "absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition",
-                  viewOnce ? "left-[22px]" : "left-0.5",
+                  viewOnce ? "left-5.5" : "left-0.5",
                 )}
               />
             </button>
@@ -694,12 +717,7 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
                     )}
                   />
                   <div>
-                    <p
-                      className={cn(
-                        "text-sm font-medium",
-                        sendMode === m.id && "text-primary",
-                      )}
-                    >
+                    <p className={cn("text-sm font-medium", sendMode === m.id && "text-primary")}>
                       {m.label}
                     </p>
                     <p className="text-[11px] text-muted-foreground">{m.desc}</p>
@@ -708,13 +726,13 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
               ))}
             </div>
             {sendMode === "direct" && (
-            <div className="mt-2 animate-fade-in">
-                <UserSearch 
-                  selected={recipient} 
+              <div className="mt-2 animate-fade-in">
+                <UserSearch
+                  selected={recipient}
                   onSelect={(email, pubKey) => {
                     setRecipient(email);
                     if (pubKey) setHybridReceiverPubKey(pubKey);
-                  }} 
+                  }}
                 />
               </div>
             )}

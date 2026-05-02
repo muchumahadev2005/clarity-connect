@@ -1,5 +1,12 @@
 const Message = require('../models/message.model');
 const User = require('../models/user.model');
+const {
+  storeEncryptedPayload,
+  loadEncryptedPayload,
+  deleteEncryptedPayload,
+} = require('../utils/payloadStorage');
+
+const maxInlinePayloadBytes = Number(process.env.MAX_INLINE_MESSAGE_BYTES || 12 * 1024 * 1024);
 
 exports.sendMessage = async (req, res, next) => {
   try {
@@ -14,6 +21,13 @@ exports.sendMessage = async (req, res, next) => {
       expiresIn,
       expiresAt: frontendExpiresAt
     } = req.body;
+
+    if (!encryptedData || !encryptedAESKey || !iv) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid encrypted payload'
+      });
+    }
 
     const senderId = req.user.id;
     let receiverId = null;
@@ -44,8 +58,16 @@ exports.sendMessage = async (req, res, next) => {
       expiresAt = new Date(frontendExpiresAt);
     }
 
+    const encryptedDataSize = Buffer.byteLength(encryptedData, 'utf8');
+    const shouldStorePayloadExternally = encryptedDataSize > maxInlinePayloadBytes;
+    const externalPayloadName = shouldStorePayloadExternally ? `${Date.now()}-${senderId}-${Math.random().toString(36).slice(2, 8)}.enc` : null;
+
+    if (externalPayloadName) {
+      await storeEncryptedPayload(externalPayloadName, encryptedData);
+    }
+
     const message = new Message({
-      encryptedData,
+      encryptedData: shouldStorePayloadExternally ? '' : encryptedData,
       encryptedAESKey,
       iv,
       senderId,
@@ -53,6 +75,7 @@ exports.sendMessage = async (req, res, next) => {
       type: type || 'text',
       protection: protection || 'quick',
       password: password || null,
+      fileUrl: externalPayloadName,
       expiresAt
     });
 
@@ -79,13 +102,31 @@ exports.getInbox = async (req, res, next) => {
     // Soft-expiry logic: Wipe sensitive data if expiresAt is passed
     const now = new Date();
     const processedMessages = await Promise.all(messages.map(async (m) => {
-      if (m.expiresAt && m.expiresAt < now && m.encryptedData) {
+      const responseMessage = m.toObject();
+      const isExpired = responseMessage.expiresAt && responseMessage.expiresAt < now;
+
+      if (isExpired && (responseMessage.encryptedData || responseMessage.fileUrl)) {
+        if (responseMessage.fileUrl) {
+          await deleteEncryptedPayload(responseMessage.fileUrl);
+        }
+
         m.encryptedData = ""; // Wipe content
         m.encryptedAESKey = ""; // Wipe key
         m.iv = ""; // Wipe IV
+        m.fileUrl = null;
         await m.save();
+
+        responseMessage.encryptedData = "";
+        responseMessage.encryptedAESKey = "";
+        responseMessage.iv = "";
+        responseMessage.fileUrl = null;
       }
-      return m;
+
+      if (!isExpired && !responseMessage.encryptedData && responseMessage.fileUrl) {
+        responseMessage.encryptedData = await loadEncryptedPayload(responseMessage.fileUrl);
+      }
+
+      return responseMessage;
     }));
 
     res.status(200).json({ success: true, data: processedMessages });
@@ -105,13 +146,31 @@ exports.getOutbox = async (req, res, next) => {
     // Soft-expiry logic: Wipe sensitive data if expiresAt is passed
     const now = new Date();
     const processedMessages = await Promise.all(messages.map(async (m) => {
-      if (m.expiresAt && m.expiresAt < now && m.encryptedData) {
+      const responseMessage = m.toObject();
+      const isExpired = responseMessage.expiresAt && responseMessage.expiresAt < now;
+
+      if (isExpired && (responseMessage.encryptedData || responseMessage.fileUrl)) {
+        if (responseMessage.fileUrl) {
+          await deleteEncryptedPayload(responseMessage.fileUrl);
+        }
+
         m.encryptedData = ""; // Wipe content
         m.encryptedAESKey = ""; // Wipe key
         m.iv = ""; // Wipe IV
+        m.fileUrl = null;
         await m.save();
+
+        responseMessage.encryptedData = "";
+        responseMessage.encryptedAESKey = "";
+        responseMessage.iv = "";
+        responseMessage.fileUrl = null;
       }
-      return m;
+
+      if (!isExpired && !responseMessage.encryptedData && responseMessage.fileUrl) {
+        responseMessage.encryptedData = await loadEncryptedPayload(responseMessage.fileUrl);
+      }
+
+      return responseMessage;
     }));
 
     res.status(200).json({ success: true, data: processedMessages });
@@ -133,6 +192,10 @@ exports.deleteMessage = async (req, res, next) => {
     // Only sender or receiver can delete the message
     if (message.senderId?.toString() !== userId && message.receiverId?.toString() !== userId) {
       return res.status(403).json({ success: false, message: 'Not authorized to delete this message' });
+    }
+
+    if (message.fileUrl) {
+      await deleteEncryptedPayload(message.fileUrl);
     }
 
     await Message.findByIdAndDelete(id);

@@ -3,7 +3,7 @@ const mongoose = require('mongoose');
 const messageSchema = new mongoose.Schema({
   encryptedData: {
     type: String,
-    required: true
+    default: ''
   },
   encryptedAESKey: {
     type: String,
