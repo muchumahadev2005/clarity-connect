@@ -43,30 +43,42 @@ function SecureSendApp() {
 
         setUser(userRes.data.user);
 
-        const mapMsg = (m: any, folder: "inbox" | "sent") => ({
+        const mapMsg = (m: any, folder: "inbox" | "sent") => {
+          const isExpired = Boolean(m.expiresAt && new Date(m.expiresAt) < new Date());
+          const isDestructed = isExpired || Boolean(m.viewOnce && (m.views || 0) > 0);
+          const hasEncryptedPayload = Boolean(m.encryptedData && m.encryptedAESKey && m.iv);
+
+          return {
           id: m._id,
           folder,
           sender:
             folder === "inbox"
               ? m.senderId?.email || "Anonymous"
               : `You → ${m.receiverId?.email || "Link"}`,
-          preview: m.type === "text" ? "Encrypted Message" : `Encrypted ${m.type}`,
-          content: "[Secure Message Content]", // Placeholder until decrypted
+          preview: isDestructed
+            ? "Message destructed or expired"
+            : m.type === "text"
+              ? "Encrypted Message"
+              : `Encrypted ${m.type}`,
+          content: isDestructed ? "" : "[Secure Message Content]",
           type: m.type,
           protection: m.protection || "quick",
           password: m.password || "",
           expiresAt: m.expiresAt,
           viewOnce: m.viewOnce,
-          status: m.expiresAt && new Date(m.expiresAt) < new Date() ? "expired" : "new",
+          status: isDestructed ? "expired" : "new",
           timestamp: m.createdAt,
           views: m.views || 0,
           logs: m.logs || [],
-          encrypted: {
-            encryptedData: m.encryptedData,
-            encryptedAESKey: m.encryptedAESKey,
-            iv: m.iv,
-          },
-        });
+          encrypted: hasEncryptedPayload
+            ? {
+                encryptedData: m.encryptedData,
+                encryptedAESKey: m.encryptedAESKey,
+                iv: m.iv,
+              }
+            : undefined,
+          } as SecureMessage;
+        };
 
         const allMessages = [
           ...inRes.data.data.map((m: any) => mapMsg(m, "inbox")),
@@ -89,7 +101,13 @@ function SecureSendApp() {
         const next = prev.map((m) => {
           if (m.expiresAt && new Date(m.expiresAt) < now && m.status !== "expired") {
             changed = true;
-            return { ...m, status: "expired" as const };
+            return {
+              ...m,
+              status: "expired" as const,
+              preview: "Message destructed or expired",
+              content: "",
+              encrypted: undefined,
+            };
           }
           return m;
         });

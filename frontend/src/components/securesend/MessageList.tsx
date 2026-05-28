@@ -102,6 +102,8 @@ export function MessageList({ folder, messages, selectedId, onSelect, query, onQ
           <ul>
             {messages.map((m) => {
               const isActive = m.id === selectedId;
+              const previewText =
+                m.status === "expired" ? "Message destructed or expired" : m.preview;
               return (
                 <li key={m.id}>
                   <button
@@ -132,7 +134,7 @@ export function MessageList({ folder, messages, selectedId, onSelect, query, onQ
                           <>
                             <TypeIcon type={m.type} />{" "}
                             <span className="align-middle">
-                              {m.stealth ? "Looks like a routine status update…" : m.preview}
+                              {m.stealth ? "Looks like a routine status update…" : previewText}
                             </span>
                           </>
                         )}

@@ -8,6 +8,27 @@ const {
 
 const maxInlinePayloadBytes = Number(process.env.MAX_INLINE_MESSAGE_BYTES || 12 * 1024 * 1024);
 
+const wipeMessagePayload = async (message) => {
+  if (message.fileUrl) {
+    await deleteEncryptedPayload(message.fileUrl);
+  }
+
+  message.encryptedData = '';
+  message.encryptedAESKey = '';
+  message.iv = '';
+  message.password = null;
+  message.fileUrl = null;
+  await message.save();
+};
+
+const syncWipedPayloadToResponse = (responseMessage) => {
+  responseMessage.encryptedData = '';
+  responseMessage.encryptedAESKey = '';
+  responseMessage.iv = '';
+  responseMessage.password = null;
+  responseMessage.fileUrl = null;
+};
+
 exports.sendMessage = async (req, res, next) => {
   try {
     const { 
@@ -109,21 +130,9 @@ exports.getInbox = async (req, res, next) => {
       const responseMessage = m.toObject();
       const isExpired = responseMessage.expiresAt && responseMessage.expiresAt < now;
 
-      if (isExpired && (responseMessage.encryptedData || responseMessage.fileUrl)) {
-        if (responseMessage.fileUrl) {
-          await deleteEncryptedPayload(responseMessage.fileUrl);
-        }
-
-        m.encryptedData = ""; // Wipe content
-        m.encryptedAESKey = ""; // Wipe key
-        m.iv = ""; // Wipe IV
-        m.fileUrl = null;
-        await m.save();
-
-        responseMessage.encryptedData = "";
-        responseMessage.encryptedAESKey = "";
-        responseMessage.iv = "";
-        responseMessage.fileUrl = null;
+      if (isExpired && (responseMessage.encryptedData || responseMessage.encryptedAESKey || responseMessage.iv || responseMessage.password || responseMessage.fileUrl)) {
+        await wipeMessagePayload(m);
+        syncWipedPayloadToResponse(responseMessage);
       }
 
       if (!isExpired && !responseMessage.encryptedData && responseMessage.fileUrl) {
@@ -153,21 +162,9 @@ exports.getOutbox = async (req, res, next) => {
       const responseMessage = m.toObject();
       const isExpired = responseMessage.expiresAt && responseMessage.expiresAt < now;
 
-      if (isExpired && (responseMessage.encryptedData || responseMessage.fileUrl)) {
-        if (responseMessage.fileUrl) {
-          await deleteEncryptedPayload(responseMessage.fileUrl);
-        }
-
-        m.encryptedData = ""; // Wipe content
-        m.encryptedAESKey = ""; // Wipe key
-        m.iv = ""; // Wipe IV
-        m.fileUrl = null;
-        await m.save();
-
-        responseMessage.encryptedData = "";
-        responseMessage.encryptedAESKey = "";
-        responseMessage.iv = "";
-        responseMessage.fileUrl = null;
+      if (isExpired && (responseMessage.encryptedData || responseMessage.encryptedAESKey || responseMessage.iv || responseMessage.password || responseMessage.fileUrl)) {
+        await wipeMessagePayload(m);
+        syncWipedPayloadToResponse(responseMessage);
       }
 
       if (!isExpired && !responseMessage.encryptedData && responseMessage.fileUrl) {
@@ -257,14 +254,11 @@ exports.markViewed = async (req, res, next) => {
       userId: viewerId
     });
 
-    // Handle View Once logic
-    if (message.viewOnce && message.views > 1) {
-       // It was already viewed once before this call (this is the 2nd view)
-       // Or we can handle it such that the next fetch sees it as expired
-       // For now, let's just keep the log
-    }
-
     await message.save();
+
+    if (message.viewOnce && (message.encryptedData || message.encryptedAESKey || message.iv || message.password || message.fileUrl)) {
+      await wipeMessagePayload(message);
+    }
 
     // Fetch updated message with populated log users
     const updatedMessage = await Message.findById(id).populate('logs.userId', 'email');

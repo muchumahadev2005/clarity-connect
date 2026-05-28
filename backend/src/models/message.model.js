@@ -7,11 +7,11 @@ const messageSchema = new mongoose.Schema({
   },
   encryptedAESKey: {
     type: String,
-    required: true
+    default: ''
   },
   iv: {
     type: String,
-    required: true
+    default: ''
   },
   senderId: {
     type: mongoose.Schema.Types.ObjectId,
