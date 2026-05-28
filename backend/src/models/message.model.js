@@ -67,14 +67,6 @@ const messageSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Logic rule: senderId should be null when isAnonymous = true
-messageSchema.pre('save', function(next) {
-  if (this.isAnonymous) {
-    this.senderId = null;
-  }
-  next();
-});
-
 // Index for expiresAt to allow efficient querying
 messageSchema.index({ expiresAt: 1 });
 

@@ -104,18 +104,36 @@ export async function decryptAESKey(
 export async function hybridEncrypt(
   message: string,
   publicKey: CryptoKey,
+  onProgress?: (aesKeyPreview: string, rsaWrappedKeyPreview: string) => void
 ): Promise<HybridPayload> {
   const aesKey = await generateAESKey();
+  
+  const rawAesKeyBuffer = await crypto.subtle.exportKey("raw", aesKey);
+  const rawAesBase64 = bufToB64(rawAesKeyBuffer);
+  if (onProgress) onProgress(rawAesBase64, "");
+
   const { encryptedData, iv } = await encryptMessage(message, aesKey);
+  
   const encryptedAESKey = await encryptAESKey(aesKey, publicKey);
+  if (onProgress) onProgress(rawAesBase64, encryptedAESKey);
+
   return { encryptedData, encryptedAESKey, iv };
 }
 
 export async function hybridDecrypt(
   payload: HybridPayload,
   privateKey: CryptoKey,
+  onProgress?: (aesKeyPreview: string, rsaWrappedKeyPreview: string) => void
 ): Promise<string> {
+  if (onProgress) onProgress("Decrypting...", payload.encryptedAESKey);
+  
   const aesKey = await decryptAESKey(payload.encryptedAESKey, privateKey);
+  
+  const rawAesKeyBuffer = await crypto.subtle.exportKey("raw", aesKey);
+  const rawAesBase64 = bufToB64(rawAesKeyBuffer);
+  
+  if (onProgress) onProgress(rawAesBase64, payload.encryptedAESKey);
+  
   return decryptMessage(payload.encryptedData, aesKey, payload.iv);
 }
 
@@ -154,8 +172,31 @@ export async function getOwnPrivateKey(): Promise<CryptoKey> {
 
 // ---------- RSA key pair management (localStorage persisted) ----------
 
-const LS_PUBLIC = "securesend.rsa.publicKey";
-const LS_PRIVATE = "securesend.rsa.privateKey";
+function getUserSpecificKeys(): { LS_PUBLIC: string; LS_PRIVATE: string } {
+  // Get current user's email from localStorage
+  const userEmail = typeof window !== "undefined" ? localStorage.getItem("userEmail") : null;
+  const userId = userEmail || "default";
+  
+  return {
+    LS_PUBLIC: `securesend.rsa.publicKey.${userId}`,
+    LS_PRIVATE: `securesend.rsa.privateKey.${userId}`,
+  };
+}
+
+// Migration: Clear old non-user-specific keys from previous versions
+function migrateOldKeys() {
+  if (typeof window === "undefined") return;
+  
+  const oldPublicKey = localStorage.getItem("securesend.rsa.publicKey");
+  const oldPrivateKey = localStorage.getItem("securesend.rsa.privateKey");
+  
+  if (oldPublicKey || oldPrivateKey) {
+    console.log(`[CRYPTO] 🔄 Migrating old non-user-specific keys...`);
+    localStorage.removeItem("securesend.rsa.publicKey");
+    localStorage.removeItem("securesend.rsa.privateKey");
+    console.log(`[CRYPTO] ✅ Old keys removed. New user-specific keys will be generated.`);
+  }
+}
 
 export async function generateRSAKeyPair(): Promise<CryptoKeyPair> {
   return crypto.subtle.generateKey(
@@ -213,27 +254,42 @@ export async function loadOrCreateRSAKeyPair(): Promise<{
       publicKeyB64: await exportPublicKey(kp.publicKey),
     };
   }
+  
+  // Run migration for old keys
+  migrateOldKeys();
+  
+  const { LS_PUBLIC, LS_PRIVATE } = getUserSpecificKeys();
   const pubB64 = localStorage.getItem(LS_PUBLIC);
   const privB64 = localStorage.getItem(LS_PRIVATE);
+  
+  console.log(`[CRYPTO] Loading RSA keys for user: ${localStorage.getItem("userEmail")}`);
+  
   if (pubB64 && privB64) {
     try {
+      console.log(`[CRYPTO] ✅ Found existing keys in storage`);
       const publicKey = await importPublicKey(pubB64);
       const privateKey = await importPrivateKey(privB64);
       return { publicKey, privateKey, publicKeyB64: pubB64 };
     } catch {
       // fall through and regenerate
+      console.log(`[CRYPTO] ⚠️ Failed to import stored keys, regenerating...`);
     }
   }
+  
+  console.log(`[CRYPTO] Generating new RSA key pair...`);
   const kp = await generateRSAKeyPair();
   const newPub = await exportPublicKey(kp.publicKey);
   const newPriv = await exportPrivateKey(kp.privateKey);
   localStorage.setItem(LS_PUBLIC, newPub);
   localStorage.setItem(LS_PRIVATE, newPriv);
+  console.log(`[CRYPTO] ✅ New keys generated and stored`);
   return { publicKey: kp.publicKey, privateKey: kp.privateKey, publicKeyB64: newPub };
 }
 
 export function clearStoredRSAKeys() {
   if (typeof window === "undefined") return;
+  const { LS_PUBLIC, LS_PRIVATE } = getUserSpecificKeys();
   localStorage.removeItem(LS_PUBLIC);
   localStorage.removeItem(LS_PRIVATE);
+  console.log(`[CRYPTO] Cleared RSA keys for user: ${localStorage.getItem("userEmail")}`);
 }

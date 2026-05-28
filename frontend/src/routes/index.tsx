@@ -95,7 +95,7 @@ function SecureSendApp() {
         });
         return changed ? next : prev;
       });
-    }, 10000); // Check every 10 seconds
+    }, 1000); // Check every second so self-destructed messages move quickly
 
     return () => clearInterval(interval);
   }, []);
@@ -128,9 +128,10 @@ function SecureSendApp() {
 
   const filtered = useMemo(() => {
     let list = messages.filter((m) => {
-      // Changed: Don't separate expired messages to different folder
-      // They stay in inbox/sent and show "Expired" badge
-      // Only show truly deleted messages out of the list
+      if (folder === "expired") {
+        return m.status === "expired";
+      }
+
       return m.folder === folder;
     });
 
@@ -168,7 +169,7 @@ function SecureSendApp() {
           m.id === id
             ? {
                 ...m,
-                status: "viewed",
+                status: m.status === "expired" ? "expired" : "viewed",
                 views: res.data.data.views,
                 logs: res.data.data.logs,
               }

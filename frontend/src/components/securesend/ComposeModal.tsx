@@ -25,10 +25,10 @@ import api from "@/lib/api";
 import type { MessageType, ProtectionMode } from "./types";
 import { cn } from "@/lib/utils";
 import { UserSearch } from "./UserSearch";
+
 import { HybridSteps } from "./HybridSteps";
 import {
   hybridEncrypt,
-  getRecipientPublicKey,
   importPublicKey,
   loadOrCreateRSAKeyPair,
 } from "./crypto";
@@ -168,6 +168,8 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
   const [hybridReceiverPubKey, setHybridReceiverPubKey] = useState("");
   const [ownPublicKey, setOwnPublicKey] = useState<string>("");
   const [ownKeyCopied, setOwnKeyCopied] = useState(false);
+  const [aesKeyPreview, setAesKeyPreview] = useState("");
+  const [rsaWrappedKeyPreview, setRsaWrappedKeyPreview] = useState("");
 
   // Load (or generate) the user's RSA key pair the first time hybrid is opened.
   useEffect(() => {
@@ -193,6 +195,64 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
       cancelled = true;
     };
   }, [protection, ownPublicKey]);
+
+  // Auto-fetch receiver's public key when email is entered in hybrid mode
+  useEffect(() => {
+    if (protection !== "hybrid" || !hybridReceiver.trim()) {
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      try {
+        const trimmedEmail = hybridReceiver.trim();
+        
+        // Simple email validation - must contain @ and .
+        if (!trimmedEmail.includes("@") || !trimmedEmail.includes(".")) {
+          console.log("Waiting for complete email...");
+          return;
+        }
+
+        console.log(`[AUTO-FETCH] Starting fetch for: ${trimmedEmail}`);
+        const apiUrl = `/users/search?q=${encodeURIComponent(trimmedEmail)}&protection=hybrid`;
+        console.log(`[AUTO-FETCH] API URL: ${apiUrl}`);
+        
+        const res = await api.get(apiUrl);
+        console.log(`[AUTO-FETCH] Response status:`, res.status);
+        console.log(`[AUTO-FETCH] Response data:`, res.data);
+        
+        if (res.data && res.data.data) {
+          console.log(`[AUTO-FETCH] Found ${res.data.data.length} results`);
+          
+          if (res.data.data.length > 0) {
+            // Find exact email match (case-insensitive)
+            const user = res.data.data.find((u: any) => 
+              u.email.toLowerCase() === trimmedEmail.toLowerCase()
+            );
+            
+            if (user) {
+              console.log(`[AUTO-FETCH] Exact match found:`, user);
+              if (user.publicKey) {
+                console.log(`[AUTO-FETCH] ✅ Public key found! Auto-loading...`);
+                setHybridReceiverPubKey(user.publicKey);
+              } else {
+                console.log(`[AUTO-FETCH] ⚠️ User found but NO public key in database`);
+              }
+            } else {
+              console.log(`[AUTO-FETCH] No exact email match (partial matches available)`);
+            }
+          } else {
+            console.log(`[AUTO-FETCH] ❌ No users found`);
+          }
+        } else {
+          console.log(`[AUTO-FETCH] Invalid response format`);
+        }
+      } catch (err) {
+        console.error(`[AUTO-FETCH] Error:`, err);
+      }
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [hybridReceiver, protection]);
 
   const copyOwnKey = async () => {
     if (!ownPublicKey) return;
@@ -281,6 +341,8 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
     setEncStep(0);
     setHybridReceiver("");
     setHybridReceiverPubKey("");
+    setAesKeyPreview("");
+    setRsaWrappedKeyPreview("");
   };
 
   const submit = async () => {
@@ -326,6 +388,10 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
     }
 
     if (!finalContent.trim()) return;
+    if (sendMode === "direct" && !recipient) {
+      toast.error("Select a user before sending directly");
+      return;
+    }
     if (protection === "hybrid") {
       if (!hybridReceiver.trim()) {
         toast.error("Enter the receiver email or username");
@@ -341,8 +407,7 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
     try {
       // Real hybrid encryption with Web Crypto API.
       setEncStep(1);
-      // Step 1: select RSA public key — receiver-supplied for hybrid mode,
-      // otherwise the demo session key for quick / password / secret-key modes.
+      // Step 1: select RSA public key.
       let publicKey: CryptoKey;
       if (protection === "hybrid") {
         try {
@@ -351,7 +416,7 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
           throw new Error("Invalid receiver public key");
         }
       } else {
-        publicKey = await getRecipientPublicKey();
+        publicKey = (await loadOrCreateRSAKeyPair()).publicKey;
       }
       setEncStep(2);
       // Step 2: encrypt envelope (body + protection metadata) with AES-GCM,
@@ -362,14 +427,17 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
         password: password || null,
         body: finalContent,
       });
-      const base = await hybridEncrypt(envelope, publicKey);
+      const base = await hybridEncrypt(envelope, publicKey, (aesBase64, wrappedBase64) => {
+        setAesKeyPreview(aesBase64);
+        setRsaWrappedKeyPreview(wrappedBase64);
+      });
       const encrypted: EncryptedPayload = {
         ...base,
         mode: "hybrid",
         receiver: protection === "hybrid" ? hybridReceiver.trim() : null,
       };
       setEncStep(3);
-      await new Promise((r) => setTimeout(r, 250));
+      await new Promise((r) => setTimeout(r, 2500)); // Pause briefly so user can read the AES key and see the encryption in action
       setEncStep(4);
       onEncrypt({
         type: tab,
@@ -380,7 +448,7 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
         viewOnce,
         link,
         sendMode,
-        recipient: protection === "hybrid" ? hybridReceiver.trim() : recipient,
+        recipient: sendMode === "direct" ? recipient : null,
         attachmentName,
         encrypted,
       });
@@ -462,7 +530,12 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
 
           {encStep > 0 && (
             <div className="animate-fade-in">
-              <HybridSteps mode="encrypt" step={encStep} />
+              <HybridSteps 
+                mode="encrypt" 
+                step={encStep} 
+                aesKeyPreview={aesKeyPreview}
+                rsaWrappedKeyPreview={rsaWrappedKeyPreview}
+              />
             </div>
           )}
 
@@ -611,26 +684,32 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
                   <input
                     value={hybridReceiver}
                     onChange={(e) => setHybridReceiver(e.target.value)}
-                    placeholder="Enter receiver email or username"
+                    placeholder="Enter receiver email (public key will auto-load)"
                     className="w-full rounded-xl border border-border bg-surface px-3.5 py-2.5 text-sm outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/15"
                   />
                 </div>
 
                 <div>
                   <label className="mb-1 flex items-center justify-between text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                    <span>Public Key (for demo only)</span>
+                    <span>Public Key (Auto-loaded)</span>
+                    <button
+                      type="button"
+                      onClick={() => setHybridReceiverPubKey("")}
+                      className="text-[10px] text-destructive hover:underline"
+                    >
+                      Clear
+                    </button>
                   </label>
                   <textarea
                     value={hybridReceiverPubKey}
                     onChange={(e) => setHybridReceiverPubKey(e.target.value)}
-                    placeholder="Paste Receiver Public Key…"
+                    placeholder="Public key will load automatically when you enter a valid email..."
                     rows={3}
                     spellCheck={false}
                     className="w-full resize-none rounded-xl border border-border bg-surface-muted px-3.5 py-2.5 font-mono text-[11px] leading-relaxed outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/15"
                   />
                   <p className="mt-1 text-[11px] text-muted-foreground">
-                    Ask the receiver to share their public key. This will be automated in
-                    production.
+                    Public key is automatically fetched from the database when you enter the receiver email.
                   </p>
                 </div>
 
@@ -639,22 +718,49 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
                     <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                       Your Public Key
                     </span>
-                    <button
-                      type="button"
-                      onClick={copyOwnKey}
-                      disabled={!ownPublicKey}
-                      className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-medium text-primary transition hover:bg-primary-soft disabled:opacity-50"
-                    >
-                      {ownKeyCopied ? (
-                        <>
-                          <Check className="h-3 w-3" /> Copied
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="h-3 w-3" /> Copy Public Key
-                        </>
-                      )}
-                    </button>
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          try {
+                            // Delete from backend database
+                            await api.delete('/keys/clear', {
+                              headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+                            });
+                            
+                            // Clear from localStorage
+                            const userEmail = localStorage.getItem('userEmail');
+                            localStorage.removeItem(`securesend.rsa.publicKey.${userEmail}`);
+                            localStorage.removeItem(`securesend.rsa.privateKey.${userEmail}`);
+                            
+                            setOwnPublicKey('');
+                            toast.success('✅ Public key cleared from database and device. Close and reopen hybrid mode to generate new unique key.');
+                          } catch (err) {
+                            console.error('Failed to clear key', err);
+                            toast.error('Failed to clear public key');
+                          }
+                        }}
+                        className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-medium text-destructive transition hover:bg-red-50 border border-destructive/20"
+                      >
+                        🔄 Regenerate New Key
+                      </button>
+                      <button
+                        type="button"
+                        onClick={copyOwnKey}
+                        disabled={!ownPublicKey}
+                        className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-medium text-primary transition hover:bg-primary-soft disabled:opacity-50"
+                      >
+                        {ownKeyCopied ? (
+                          <>
+                            <Check className="h-3 w-3" /> Copied
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="h-3 w-3" /> Copy Public Key
+                          </>
+                        )}
+                      </button>
+                    </div>
                   </div>
                   <p className="mt-1.5 max-h-20 overflow-auto break-all font-mono text-[10px] leading-relaxed text-foreground/70">
                     {ownPublicKey || "Generating your secure key…"}
@@ -825,17 +931,22 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
                 </button>
               ))}
             </div>
+
             {sendMode === "direct" && (
               <div className="mt-2 animate-fade-in">
                 <UserSearch
                   selected={recipient}
-                  onSelect={(email, pubKey) => {
+                  protection={protection}
+                  onSelect={(email, publicKey) => {
                     setRecipient(email);
-                    if (pubKey) setHybridReceiverPubKey(pubKey);
+                    setHybridReceiver(email || "");
+                    if (publicKey) setHybridReceiverPubKey(publicKey);
+                    if (!email) setHybridReceiverPubKey("");
                   }}
                 />
               </div>
             )}
+
           </div>
         </div>
 

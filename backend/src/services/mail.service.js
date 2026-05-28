@@ -13,7 +13,21 @@ const smtpTransporter = nodemailer.createTransport({
     : undefined,
 });
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+let resendClient;
+
+const getResendClient = () => {
+  if (!process.env.RESEND_API_KEY) {
+    const error = new Error('RESEND_API_KEY is missing from environment variables.');
+    error.status = 500;
+    throw error;
+  }
+
+  if (!resendClient) {
+    resendClient = new Resend(process.env.RESEND_API_KEY);
+  }
+
+  return resendClient;
+};
 
 const isPlainObject = (value) =>
   Boolean(value) && typeof value === 'object' && (value.constructor === Object || Object.getPrototypeOf(value) === null);
@@ -57,6 +71,48 @@ const throwResendError = (error, fallbackMessage) => {
 };
 
 const sendOtpEmail = async (email, otp) => {
+  const provider = String(process.env.AUTH_EMAIL_PROVIDER || 'resend').toLowerCase();
+
+  if (provider !== 'smtp' && process.env.RESEND_API_KEY) {
+    return sendOtpEmailViaResend(email, otp);
+  }
+
+  return sendOtpEmailViaSmtp(email, otp);
+};
+
+const sendOtpEmailViaResend = async (email, otp) => {
+  const from = process.env.RESEND_FROM || 'SecureSend <noreply@securesend.co.in>';
+
+  if (!process.env.RESEND_API_KEY) {
+    const error = new Error('RESEND_API_KEY is missing for authentication emails.');
+    error.status = 500;
+    throw error;
+  }
+
+  try {
+    const result = await getResendClient().emails.send({
+      from,
+      to: sanitizePlainText(email),
+      subject: 'Your SecureSend Verification Code',
+      text: `Your SecureSend verification code is ${otp}. This code will expire in 10 minutes.`,
+      html: getOtpEmailHtml(otp),
+    });
+
+    const data = normalizeResendSendResult(result);
+    if (!data?.id) {
+      const error = new Error('Resend did not return a message id. Email may not have been accepted.');
+      error.status = 502;
+      error.details = data;
+      throw error;
+    }
+
+    return { provider: 'resend', data };
+  } catch (error) {
+    throwResendError(error, 'Failed to send verification email via Resend.');
+  }
+};
+
+const sendOtpEmailViaSmtp = async (email, otp) => {
   try {
     if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASS) {
       const error = new Error('SMTP configuration is missing for authentication emails.');
@@ -68,24 +124,27 @@ const sendOtpEmail = async (email, otp) => {
       from: `"SecureSend" <${process.env.SMTP_USER}>`,
       to: email,
       subject: 'Your SecureSend Verification Code',
-      html: `
-        <div style="font-family: sans-serif; max-width: 500px; margin: auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
-          <h2 style="color: #6366f1; text-align: center;">SecureSend</h2>
-          <p>Hello,</p>
-          <p>Your verification code is:</p>
-          <div style="background: #f4f4f9; padding: 15px; text-align: center; font-size: 24px; font-weight: bold; letter-spacing: 5px; color: #333; border-radius: 8px;">
-            ${escapeHtml(otp)}
-          </div>
-          <p style="font-size: 14px; color: #666; margin-top: 20px;">
-            This code will expire in 10 minutes. If you didn't request this, please ignore this email.
-          </p>
-        </div>
-      `,
+      text: `Your SecureSend verification code is ${otp}. This code will expire in 10 minutes.`,
+      html: getOtpEmailHtml(otp),
     });
   } catch (error) {
     throwResendError(error, 'Failed to send verification email.');
   }
 };
+
+const getOtpEmailHtml = (otp) => `
+  <div style="font-family: sans-serif; max-width: 500px; margin: auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
+    <h2 style="color: #6366f1; text-align: center;">SecureSend</h2>
+    <p>Hello,</p>
+    <p>Your verification code is:</p>
+    <div style="background: #f4f4f9; padding: 15px; text-align: center; font-size: 24px; font-weight: bold; letter-spacing: 5px; color: #333; border-radius: 8px;">
+      ${escapeHtml(otp)}
+    </div>
+    <p style="font-size: 14px; color: #666; margin-top: 20px;">
+      This code will expire in 10 minutes. If you didn't request this, please ignore this email.
+    </p>
+  </div>
+`;
 
 const sendAnonymousEmail = async ({ to, subject, content, alias }) => {
   const safeTo = sanitizePlainText(to);
@@ -170,7 +229,7 @@ const sendAnonymousEmailViaResend = async ({ to, subject, content, alias }) => {
       timestamp: new Date().toISOString(),
     });
 
-    const result = await resend.emails.send({
+    const result = await getResendClient().emails.send({
       from,
       to,
       subject: `Anonymous: ${subject || 'New Message'}`,

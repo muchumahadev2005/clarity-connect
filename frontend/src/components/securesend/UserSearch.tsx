@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Search, User, Clock, Loader2 } from "lucide-react";
 import api from "@/lib/api";
+import type { ProtectionMode } from "./types";
 
 function maskEmail(email: string) {
   const [user, domain] = email.split("@");
@@ -17,9 +18,10 @@ interface UserResult {
 interface Props {
   selected: string | null;
   onSelect: (email: string | null, publicKey?: string | null) => void;
+  protection?: ProtectionMode;
 }
 
-export function UserSearch({ selected, onSelect }: Props) {
+export function UserSearch({ selected, onSelect, protection }: Props) {
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -34,7 +36,12 @@ export function UserSearch({ selected, onSelect }: Props) {
     const timer = setTimeout(async () => {
       setLoading(true);
       try {
-        const res = await api.get(`/users/search?q=${encodeURIComponent(q)}`);
+        // Pass protection mode to API - only fetch publicKey for hybrid mode
+        const query = new URLSearchParams({ q });
+        if (protection) {
+          query.append('protection', protection);
+        }
+        const res = await api.get(`/users/search?${query.toString()}`);
         setResults(res.data.data);
       } catch (err) {
         console.error("Search failed", err);
@@ -44,7 +51,7 @@ export function UserSearch({ selected, onSelect }: Props) {
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [q]);
+  }, [q, protection]);
 
   if (selected) {
     return (

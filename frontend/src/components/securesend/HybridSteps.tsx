@@ -8,6 +8,8 @@ interface Props {
   /** 0 = idle, 1..3 = step in progress, 4 = complete */
   step: number;
   className?: string;
+  aesKeyPreview?: string;
+  rsaWrappedKeyPreview?: string;
 }
 
 const LABELS: Record<HybridMode, [string, string, string]> = {
@@ -15,13 +17,13 @@ const LABELS: Record<HybridMode, [string, string, string]> = {
   decrypt: ["Verify Access", "Decrypt RSA Key", "Decrypt Message"],
 };
 
-export function HybridSteps({ mode, step, className }: Props) {
+export function HybridSteps({ mode, step, className, aesKeyPreview, rsaWrappedKeyPreview }: Props) {
   const labels = LABELS[mode];
   const icons = [KeyRound, Lock, ShieldCheck];
   return (
     <div
       className={cn(
-        "rounded-xl border border-primary/20 bg-gradient-to-r from-primary-soft/60 via-surface-muted to-surface-muted px-3 py-3",
+        "rounded-xl border border-primary/20 bg-gradient-to-r from-primary-soft/60 via-surface-muted to-surface-muted px-4 py-3 flex flex-col gap-3",
         className,
       )}
     >
@@ -32,7 +34,7 @@ export function HybridSteps({ mode, step, className }: Props) {
           const active = step === idx;
           const Icon = icons[i];
           return (
-            <div key={label} className="flex flex-1 items-center gap-2 min-w-0">
+            <div key={label} className="flex flex-1 flex-col sm:flex-row items-center sm:items-start gap-2 min-w-0">
               <div
                 className={cn(
                   "flex h-8 w-8 shrink-0 items-center justify-center rounded-full ring-1 transition-all",
@@ -53,7 +55,7 @@ export function HybridSteps({ mode, step, className }: Props) {
               </div>
               <span
                 className={cn(
-                  "truncate text-[11px] font-medium",
+                  "truncate text-[11px] font-medium sm:mt-1.5",
                   done || active ? "text-foreground" : "text-muted-foreground",
                 )}
               >
@@ -62,7 +64,7 @@ export function HybridSteps({ mode, step, className }: Props) {
               {i < labels.length - 1 && (
                 <div
                   className={cn(
-                    "ml-1 mr-1 hidden h-px flex-1 sm:block",
+                    "ml-1 mr-1 hidden h-px flex-1 sm:block mt-4",
                     step > idx ? "bg-success" : "bg-border",
                   )}
                 />
@@ -71,6 +73,27 @@ export function HybridSteps({ mode, step, className }: Props) {
           );
         })}
       </div>
+
+      {(aesKeyPreview || rsaWrappedKeyPreview) && (
+        <div className="mt-2 rounded-lg bg-surface border border-border/60 p-2.5 space-y-2">
+          {aesKeyPreview && (
+            <div>
+              <p className="text-[10px] font-semibold text-primary uppercase tracking-wider">Raw AES-256 Key (Transient / Exists only in memory)</p>
+              <p className="font-mono text-[9px] break-all leading-tight text-muted-foreground mt-0.5 bg-background p-1.5 rounded border border-border/40">
+                {aesKeyPreview}
+              </p>
+            </div>
+          )}
+          {rsaWrappedKeyPreview && (
+            <div>
+              <p className="text-[10px] font-semibold text-success uppercase tracking-wider">RSA Wrapped AES Key (Final Encrypted Form)</p>
+              <p className="font-mono text-[9px] break-all leading-tight text-muted-foreground mt-0.5 bg-background p-1.5 rounded border border-border/40">
+                {rsaWrappedKeyPreview}
+              </p>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

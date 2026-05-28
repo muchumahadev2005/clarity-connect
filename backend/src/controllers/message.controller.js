@@ -18,6 +18,8 @@ exports.sendMessage = async (req, res, next) => {
       type, 
       protection,
       password,
+      isAnonymous,
+      viewOnce,
       expiresIn,
       expiresAt: frontendExpiresAt
     } = req.body;
@@ -75,6 +77,8 @@ exports.sendMessage = async (req, res, next) => {
       type: type || 'text',
       protection: protection || 'quick',
       password: password || null,
+      isAnonymous: Boolean(isAnonymous),
+      viewOnce: Boolean(viewOnce),
       fileUrl: externalPayloadName,
       expiresAt
     });
