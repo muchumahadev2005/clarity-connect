@@ -293,3 +293,49 @@ export function clearStoredRSAKeys() {
   localStorage.removeItem(LS_PRIVATE);
   console.log(`[CRYPTO] Cleared RSA keys for user: ${localStorage.getItem("userEmail")}`);
 }
+
+// ---------- high level symmetric flow ----------
+
+export async function deriveKeyFromPassword(password: string): Promise<CryptoKey> {
+  const encoder = new TextEncoder();
+  const passwordData = encoder.encode(password.trim());
+  const hash = await crypto.subtle.digest("SHA-256", passwordData);
+  return crypto.subtle.importKey(
+    "raw",
+    hash,
+    { name: "AES-GCM", length: 256 },
+    true,
+    ["encrypt", "decrypt"]
+  );
+}
+
+export async function symmetricEncrypt(
+  message: string,
+  secretKey: string,
+  onProgress?: (aesKeyPreview: string, rsaWrappedKeyPreview: string) => void
+): Promise<HybridPayload> {
+  const aesKey = await deriveKeyFromPassword(secretKey);
+  
+  const rawAesKeyBuffer = await crypto.subtle.exportKey("raw", aesKey);
+  const rawAesBase64 = bufToB64(rawAesKeyBuffer);
+  if (onProgress) onProgress(rawAesBase64, "N/A (Symmetric)");
+
+  const { encryptedData, iv } = await encryptMessage(message, aesKey);
+  
+  return { encryptedData, encryptedAESKey: "symmetric", iv };
+}
+
+export async function symmetricDecrypt(
+  payload: HybridPayload,
+  secretKey: string,
+  onProgress?: (aesKeyPreview: string, rsaWrappedKeyPreview: string) => void
+): Promise<string> {
+  const aesKey = await deriveKeyFromPassword(secretKey);
+  
+  const rawAesKeyBuffer = await crypto.subtle.exportKey("raw", aesKey);
+  const rawAesBase64 = bufToB64(rawAesKeyBuffer);
+  if (onProgress) onProgress(rawAesBase64, "N/A (Symmetric)");
+  
+  return decryptMessage(payload.encryptedData, aesKey, payload.iv);
+}
+

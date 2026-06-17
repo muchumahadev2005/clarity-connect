@@ -31,6 +31,7 @@ import {
   hybridEncrypt,
   importPublicKey,
   loadOrCreateRSAKeyPair,
+  symmetricEncrypt,
 } from "./crypto";
 import type { EncryptedPayload } from "./types";
 import { toast } from "sonner";
@@ -405,37 +406,58 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
     const origin = typeof window !== "undefined" ? window.location.origin : (import.meta.env.VITE_APP_URL || "https://securesend.co.in");
     const link = `${origin}/m/${Math.random().toString(36).slice(2, 10)}`;
     try {
-      // Real hybrid encryption with Web Crypto API.
       setEncStep(1);
-      // Step 1: select RSA public key.
-      let publicKey: CryptoKey;
-      if (protection === "hybrid") {
-        try {
-          publicKey = await importPublicKey(hybridReceiverPubKey);
-        } catch {
-          throw new Error("Invalid receiver public key");
-        }
+      
+      let encrypted: EncryptedPayload;
+      if (protection === "key" || protection === "password") {
+        setEncStep(2);
+        const envelope = JSON.stringify({
+          v: 1,
+          protection,
+          password: password || null,
+          body: finalContent,
+        });
+        const base = await symmetricEncrypt(envelope, password, (aesBase64, wrappedBase64) => {
+          setAesKeyPreview(aesBase64);
+          setRsaWrappedKeyPreview(wrappedBase64);
+        });
+        encrypted = {
+          ...base,
+          mode: "demo",
+          receiver: null,
+        };
       } else {
-        publicKey = (await loadOrCreateRSAKeyPair()).publicKey;
+        // Quick or Hybrid mode (uses RSA)
+        // Step 1: select RSA public key.
+        let publicKey: CryptoKey;
+        if (protection === "hybrid") {
+          try {
+            publicKey = await importPublicKey(hybridReceiverPubKey);
+          } catch {
+            throw new Error("Invalid receiver public key");
+          }
+        } else {
+          publicKey = (await loadOrCreateRSAKeyPair()).publicKey;
+        }
+        setEncStep(2);
+        // Step 2: encrypt envelope (body + protection metadata) with AES-GCM,
+        // then wrap the AES key with the receiver's RSA public key.
+        const envelope = JSON.stringify({
+          v: 1,
+          protection,
+          password: password || null,
+          body: finalContent,
+        });
+        const base = await hybridEncrypt(envelope, publicKey, (aesBase64, wrappedBase64) => {
+          setAesKeyPreview(aesBase64);
+          setRsaWrappedKeyPreview(wrappedBase64);
+        });
+        encrypted = {
+          ...base,
+          mode: "hybrid",
+          receiver: protection === "hybrid" ? hybridReceiver.trim() : null,
+        };
       }
-      setEncStep(2);
-      // Step 2: encrypt envelope (body + protection metadata) with AES-GCM,
-      // then wrap the AES key with the receiver's RSA public key.
-      const envelope = JSON.stringify({
-        v: 1,
-        protection,
-        password: password || null,
-        body: finalContent,
-      });
-      const base = await hybridEncrypt(envelope, publicKey, (aesBase64, wrappedBase64) => {
-        setAesKeyPreview(aesBase64);
-        setRsaWrappedKeyPreview(wrappedBase64);
-      });
-      const encrypted: EncryptedPayload = {
-        ...base,
-        mode: "hybrid",
-        receiver: protection === "hybrid" ? hybridReceiver.trim() : null,
-      };
       setEncStep(3);
       await new Promise((r) => setTimeout(r, 2500)); // Pause briefly so user can read the AES key and see the encryption in action
       setEncStep(4);

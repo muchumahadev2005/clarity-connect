@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import api from "@/lib/api";
+import { timeAgo } from "@/components/securesend/utils";
 
 export const Route = createFileRoute("/anonymous")({
   component: AnonymousMail,
@@ -40,39 +41,9 @@ interface AnonEmail {
   unread?: boolean;
 }
 
-const initialInbox: AnonEmail[] = [
-  {
-    id: "a1",
-    subject: "Thanks for the honest feedback",
-    preview: "I really appreciate you reaching out — this means a lot…",
-    body: "I really appreciate you reaching out — this means a lot. I had no idea the team was feeling this way, and I'd like to set up a chat to talk through it. No pressure, only if you're comfortable.",
-    sender: "Anonymous Sender",
-    time: "2h ago",
-    unread: true,
-  },
-  {
-    id: "a2",
-    subject: "Tip about the budget review",
-    preview: "Heads up — the numbers shared in the meeting do not match…",
-    body: "Heads up — the numbers shared in the meeting do not match what's in the actual ledger. You may want to double-check Q3 entries before signing off. Staying anonymous to keep things neutral.",
-    sender: "Anonymous Sender",
-    time: "Yesterday",
-    unread: true,
-  },
-  {
-    id: "a3",
-    subject: "Just wanted to say thank you 🎭",
-    preview: "Your talk last week genuinely changed how I think about…",
-    body: "Your talk last week genuinely changed how I think about my career. I didn't want to make it weird in person, so sending this anonymously. Keep doing what you're doing.",
-    sender: "Anonymous Sender",
-    time: "3d ago",
-    unread: false,
-  },
-];
-
 function AnonymousMail() {
   const [view, setView] = useState<View>("dashboard");
-  const [inbox, setInbox] = useState<AnonEmail[]>(initialInbox);
+  const [inbox, setInbox] = useState<AnonEmail[]>([]);
   const [openEmail, setOpenEmail] = useState<AnonEmail | null>(null);
   const [alias, setAlias] = useState<string | null>(null);
   const [aliasPulse, setAliasPulse] = useState(false);
@@ -84,36 +55,70 @@ function AnonymousMail() {
   const [message, setMessage] = useState("");
   const [sending, setSending] = useState(false);
 
-  /**
-   * Generate a random alias string (6-10 characters, a-z0-9)
-   * Frontend-only, no authentication required
-   */
-  const generateRandomAlias = (): string => {
-    const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
-    const length = Math.floor(Math.random() * 5) + 6; // 6-10 chars
-    let result = "";
-    for (let i = 0; i < length; i++) {
-      result += chars.charAt(Math.floor(Math.random() * chars.length));
+  const fetchInbox = async () => {
+    try {
+      const res = await api.get("/anonymous/inbox");
+      const formatted = res.data.data.map((e: any) => ({
+        id: e._id,
+        subject: e.subject,
+        preview: e.message.substring(0, 60) + (e.message.length > 60 ? "..." : ""),
+        body: e.message,
+        sender: e.isSent ? `To: ${e.to}` : "Anonymous Sender",
+        time: timeAgo(e.createdAt),
+        unread: e.isSent ? false : e.unread,
+      }));
+      setInbox(formatted);
+    } catch (err: any) {
+      console.error("Failed to fetch inbox:", err);
     }
-    return result;
+  };
+
+  const loadOrCreateAlias = async (forceRegenerate = false) => {
+    setAliasLoading(true);
+    setAliasError(null);
+
+    const userEmail = localStorage.getItem("userEmail");
+    if (!userEmail) {
+      setAliasError("Unable to determine your email. Please log in again.");
+      setAliasLoading(false);
+      return;
+    }
+
+    try {
+      const res = await api.post("/anonymous/generate-alias", { force: forceRegenerate });
+      const fullAlias = res.data.data.alias;
+      const prefix = fullAlias.split("@")[0];
+      setAlias(prefix);
+      localStorage.setItem("anonAlias", prefix);
+
+      if (forceRegenerate) {
+        setAliasPulse(true);
+        window.setTimeout(() => setAliasPulse(false), 900);
+        toast.success("New alias generated", {
+          description: fullAlias,
+        });
+        setInbox([]);
+      } else {
+        await fetchInbox();
+      }
+    } catch (err: any) {
+      setAliasError(err.response?.data?.message || "Failed to load or generate alias");
+    } finally {
+      setAliasLoading(false);
+    }
   };
 
   // Generate or retrieve alias on component mount
   useEffect(() => {
-    const existingAlias = localStorage.getItem("anonAlias");
-
-    if (existingAlias) {
-      // Reuse existing alias from this session
-      setAlias(existingAlias);
-      console.log("[AnonymousMail] Using existing session alias:", existingAlias);
-    } else {
-      // Generate new random alias
-      const newAlias = generateRandomAlias();
-      localStorage.setItem("anonAlias", newAlias);
-      setAlias(newAlias);
-      console.log("[AnonymousMail] Generated new alias:", newAlias);
-    }
+    loadOrCreateAlias();
   }, []);
+
+  // Fetch inbox whenever view changes to inbox
+  useEffect(() => {
+    if (view === "inbox") {
+      fetchInbox();
+    }
+  }, [view]);
 
   const copyAlias = async () => {
     if (!alias) return;
@@ -125,17 +130,7 @@ function AnonymousMail() {
   };
 
   const regenerateAlias = () => {
-    // Generate new alias locally (no backend call)
-    const newAlias = generateRandomAlias();
-    localStorage.setItem("anonAlias", newAlias);
-    setAlias(newAlias);
-    setAliasPulse(true);
-    window.setTimeout(() => setAliasPulse(false), 900);
-    const fullEmail = `${newAlias}@securesend.co.in`;
-    toast.success("New alias generated", {
-      description: fullEmail,
-    });
-    console.log("[AnonymousMail] Alias regenerated:", newAlias);
+    loadOrCreateAlias(true);
   };
 
   const sendAnon = async () => {
@@ -201,7 +196,7 @@ function AnonymousMail() {
             onRegenerate={regenerateAlias}
             alias={alias}
             pulse={aliasPulse}
-            inboxCount={inbox.length}
+            inboxCount={inbox.filter((e) => e.unread).length}
             aliasLoading={aliasLoading}
             aliasError={aliasError}
           />
@@ -228,7 +223,12 @@ function AnonymousMail() {
             emails={inbox}
             onOpen={(e) => {
               setOpenEmail(e);
-              setInbox((prev) => prev.map((m) => (m.id === e.id ? { ...m, unread: false } : m)));
+              if (e.unread) {
+                api.post(`/anonymous/mark-read/${e.id}`).catch((err) => {
+                  console.error("Failed to mark message as read:", err);
+                });
+                setInbox((prev) => prev.map((m) => (m.id === e.id ? { ...m, unread: false } : m)));
+              }
               setView("read");
             }}
             onBack={() => setView("dashboard")}
@@ -242,6 +242,7 @@ function AnonymousMail() {
     </div>
   );
 }
+
 
 function Dashboard({
   onCompose,
@@ -529,20 +530,6 @@ function InboxView({
   onOpen: (e: AnonEmail) => void;
   onBack: () => void;
 }) {
-  const [filter, setFilter] = useState<"all" | "unread" | "read">("all");
-  const counts = {
-    all: emails.length,
-    unread: emails.filter((e) => e.unread).length,
-    read: emails.filter((e) => !e.unread).length,
-  };
-  const visible = emails.filter((e) =>
-    filter === "all" ? true : filter === "unread" ? e.unread : !e.unread,
-  );
-  const filters: { key: "all" | "unread" | "read"; label: string }[] = [
-    { key: "all", label: "All" },
-    { key: "unread", label: "Unread" },
-    { key: "read", label: "Read" },
-  ];
   return (
     <div className="space-y-5">
       <button
@@ -560,44 +547,14 @@ function InboxView({
         </p>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
-        {filters.map((f) => {
-          const active = filter === f.key;
-          return (
-            <button
-              key={f.key}
-              onClick={() => setFilter(f.key)}
-              className={cn(
-                "inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-xs font-medium transition-colors ring-1",
-                active
-                  ? "bg-anon text-anon-foreground ring-anon"
-                  : "bg-surface text-muted-foreground ring-border hover:text-foreground hover:bg-surface-muted",
-              )}
-            >
-              {f.label}
-              <span
-                className={cn(
-                  "rounded-full px-1.5 py-0.5 text-[10px] font-semibold",
-                  active
-                    ? "bg-anon-foreground/20 text-anon-foreground"
-                    : "bg-surface-muted text-muted-foreground",
-                )}
-              >
-                {counts[f.key]}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-
-      {visible.length === 0 && (
+      {emails.length === 0 && (
         <div className="rounded-2xl border border-dashed border-border bg-surface p-8 text-center text-sm text-muted-foreground">
-          No {filter === "all" ? "" : filter} messages here.
+          No messages here.
         </div>
       )}
 
       <ul className="space-y-3">
-        {visible.map((e) => (
+        {emails.map((e) => (
           <li key={e.id}>
             <button
               onClick={() => onOpen(e)}
@@ -641,6 +598,7 @@ function ReadEmail({
   email: AnonEmail;
   onBack: () => void;
 }) {
+  const isSent = email.sender.startsWith("To: ");
   return (
     <div className="space-y-5 animate-fade-in">
       <button
@@ -656,10 +614,12 @@ function ReadEmail({
             <VenetianMask className="h-5 w-5" />
           </div>
           <div>
-            <div className="font-semibold">Anonymous Sender 🎭</div>
+            <div className="font-semibold">
+              {isSent ? `You (Anonymously)` : "Anonymous Sender"} 🎭
+            </div>
             <div className="text-xs text-muted-foreground">via securesend.co.in</div>
             <div className="text-xs text-muted-foreground">
-              to {alias} · {email.time}
+              {isSent ? `${email.sender} · ${email.time}` : `to ${alias} · ${email.time}`}
             </div>
           </div>
         </div>
@@ -671,7 +631,10 @@ function ReadEmail({
 
         <div className="mt-6 flex items-center gap-2 rounded-lg bg-anon-soft px-3 py-2 text-xs text-anon ring-1 ring-anon/20">
           <ShieldCheck className="h-3.5 w-3.5" />
-          The sender's real identity is hidden by their alias.
+          {isSent 
+            ? "Your identity was hidden from the recipient using your alias." 
+            : "The sender's real identity is hidden by their alias."
+          }
         </div>
       </article>
     </div>

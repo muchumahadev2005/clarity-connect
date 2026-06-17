@@ -22,7 +22,7 @@ import { VoicePlayer } from "./VoicePlayer";
 import { CircularTimer } from "./CircularTimer";
 import { toast } from "sonner";
 import { HybridSteps } from "./HybridSteps";
-import { hybridDecrypt, loadOrCreateRSAKeyPair, importPrivateKey } from "./crypto";
+import { hybridDecrypt, loadOrCreateRSAKeyPair, importPrivateKey, symmetricDecrypt } from "./crypto";
 
 interface Props {
   message: SecureMessage | null;
@@ -123,15 +123,24 @@ export function MessageDetail({ message, onDelete, onMarkViewed }: Props) {
       if (message.encrypted) {
         await new Promise((r) => setTimeout(r, 600)); // Pause to show step 1
         setDecryptStep(2);
-        const privateKey =
-          message.protection === "hybrid"
-            ? await importPrivateKey(privateKeyInput)
-            : (await loadOrCreateRSAKeyPair()).privateKey;
-        // RSA-OAEP unwraps the AES key, then AES-GCM decrypts the body.
-        const plaintext = await hybridDecrypt(message.encrypted, privateKey, (aes, rsa) => {
-          setAesKeyPreview(aes);
-          setRsaWrappedKeyPreview(rsa);
-        });
+        
+        let plaintext: string;
+        if (message.protection === "key" || message.protection === "password") {
+          plaintext = await symmetricDecrypt(message.encrypted, pwd, (aes, rsa) => {
+            setAesKeyPreview(aes);
+            setRsaWrappedKeyPreview(rsa);
+          });
+        } else {
+          const privateKey =
+            message.protection === "hybrid"
+              ? await importPrivateKey(privateKeyInput)
+              : (await loadOrCreateRSAKeyPair()).privateKey;
+          // RSA-OAEP unwraps the AES key, then AES-GCM decrypts the body.
+          plaintext = await hybridDecrypt(message.encrypted, privateKey, (aes, rsa) => {
+            setAesKeyPreview(aes);
+            setRsaWrappedKeyPreview(rsa);
+          });
+        }
         
         await new Promise((r) => setTimeout(r, 2000)); // Pause to show AES preview
         
