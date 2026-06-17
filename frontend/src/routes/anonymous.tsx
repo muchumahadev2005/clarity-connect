@@ -315,8 +315,8 @@ function Dashboard({
           </div>
         ) : (
           <>
-            <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-3 min-w-0">
+            <div className="mt-3 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-3 min-w-0 w-full sm:w-auto">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-linear-to-br from-anon to-[oklch(0.65_0.18_240)] text-anon-foreground">
                   <Mail className="h-5 w-5" />
                 </div>
@@ -328,7 +328,7 @@ function Dashboard({
                 ) : alias ? (
                   <span
                     key={alias}
-                    className="truncate font-mono text-lg font-semibold animate-fade-in"
+                    className="truncate font-mono text-base sm:text-lg font-semibold animate-fade-in"
                   >
                     {alias}@securesend.co.in
                   </span>
@@ -336,18 +336,18 @@ function Dashboard({
                   <span className="text-sm text-muted-foreground">Failed to load alias</span>
                 )}
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 w-full sm:w-auto">
                 <button
                   onClick={onCopy}
                   disabled={!alias || aliasLoading}
-                  className="inline-flex items-center gap-2 rounded-full bg-anon-soft px-3.5 py-2 text-sm font-medium text-anon ring-1 ring-anon/20 hover:bg-anon hover:text-anon-foreground transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 rounded-full bg-anon-soft px-4 py-2.5 text-sm font-medium text-anon ring-1 ring-anon/20 hover:bg-anon hover:text-anon-foreground transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Copy className="h-4 w-4" /> Copy
                 </button>
                 <button
                   onClick={onRegenerate}
                   disabled={aliasLoading}
-                  className="inline-flex items-center gap-2 rounded-full bg-anon px-3.5 py-2 text-sm font-medium text-anon-foreground ring-1 ring-anon hover:opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 rounded-full bg-anon px-4 py-2.5 text-sm font-medium text-anon-foreground ring-1 ring-anon hover:opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <RefreshCw className={cn("h-4 w-4", pulse && "animate-spin")} />
                   Regenerate
@@ -567,18 +567,20 @@ function InboxView({
                 <VenetianMask className="h-5 w-5" />
               </div>
               <div className="min-w-0 flex-1">
-                <div className="flex items-center justify-between gap-2">
-                  <span className={cn("truncate", e.unread ? "font-semibold" : "font-medium")}>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-2">
+                  <span className={cn("truncate text-sm sm:text-base", e.unread ? "font-semibold" : "font-medium")}>
                     {e.unread && (
                       <span className="mr-2 inline-block h-2 w-2 rounded-full bg-anon align-middle" />
                     )}
                     {e.subject}
                   </span>
-                  <span className="shrink-0 text-[11px] text-muted-foreground">{e.time}</span>
+                  <span className="shrink-0 text-[10px] sm:text-[11px] text-muted-foreground">{e.time}</span>
                 </div>
-                <p className="mt-0.5 truncate text-sm text-muted-foreground">{e.preview}</p>
-                <div className="mt-2 inline-flex items-center gap-1 rounded-full bg-anon-soft px-2 py-0.5 text-[11px] font-medium text-anon ring-1 ring-anon/20">
-                  {e.sender} 🎭
+                <p className="mt-0.5 truncate text-xs sm:text-sm text-muted-foreground">{e.preview}</p>
+                <div className="mt-2 flex">
+                  <div className="inline-flex items-center gap-1 rounded-full bg-anon-soft px-2 py-0.5 text-[10px] sm:text-[11px] font-medium text-anon ring-1 ring-anon/20 max-w-full">
+                    <span className="truncate">{e.sender}</span> 🎭
+                  </div>
                 </div>
               </div>
             </button>

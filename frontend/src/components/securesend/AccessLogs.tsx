@@ -13,7 +13,7 @@ export function AccessLogs({ messages, onToggleSidebar }: { messages: SecureMess
         <div className="flex items-center gap-3">
           <button
             onClick={() => onToggleSidebar?.()}
-            className="md:hidden rounded-full p-2 hover:bg-secondary transition-colors -ml-2"
+            className="lg:hidden rounded-full p-2 hover:bg-secondary transition-colors -ml-2"
             aria-label="Open menu"
           >
             <Menu className="h-5 w-5 text-muted-foreground" />

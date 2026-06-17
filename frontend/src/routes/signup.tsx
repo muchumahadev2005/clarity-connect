@@ -235,12 +235,12 @@ function SignupPage() {
 
       <div className="mx-auto flex min-h-screen w-full max-w-md flex-col items-center justify-center px-4 py-10">
         {/* Brand */}
-        <div className="mb-6 flex items-center gap-2">
+        <Link to="/landing" className="mb-6 flex items-center gap-2 hover:opacity-90 transition-opacity">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-elegant">
             <ShieldCheck className="h-6 w-6" />
           </div>
           <span className="text-xl font-semibold tracking-tight">SecureSend</span>
-        </div>
+        </Link>
 
         <div
           key={step}
@@ -340,7 +340,7 @@ function SignupPage() {
                 </p>
               </div>
 
-              <div className="flex justify-center gap-2 sm:gap-3" onPaste={handleOtpPaste}>
+              <div className="grid grid-cols-6 gap-2 sm:gap-3 justify-center" onPaste={handleOtpPaste}>
                 {otp.map((d, i) => (
                   <input
                     key={i}
@@ -353,8 +353,8 @@ function SignupPage() {
                     onChange={(e) => handleOtpChange(i, e.target.value)}
                     onKeyDown={(e) => handleOtpKey(i, e)}
                     className={cn(
-                      "h-12 w-10 sm:h-14 sm:w-12 rounded-xl border bg-background text-center text-lg font-semibold outline-none transition-all",
-                      "focus:ring-2 focus:ring-primary/30 focus:border-primary focus:scale-105",
+                      "w-full aspect-square rounded-xl border bg-background text-center text-base sm:text-lg font-semibold outline-none transition-all flex items-center justify-center min-h-[40px] focus:scale-105",
+                      "focus:ring-2 focus:ring-primary/30 focus:border-primary",
                       otpError
                         ? "border-destructive focus:ring-destructive/30 focus:border-destructive"
                         : d

@@ -18,6 +18,8 @@ import {
   Github,
   Twitter,
   Mail,
+  Menu,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -77,6 +79,8 @@ function LandingPage() {
 
 /* ---------------- NAV ---------------- */
 function Nav() {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
   return (
     <header className="sticky top-0 z-40 border-b border-border/60 bg-background/70 backdrop-blur-xl">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
@@ -111,8 +115,37 @@ function Nav() {
               <ArrowRight className="transition group-hover:translate-x-0.5" />
             </Button>
           </Link>
+          <button
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            className="md:hidden rounded-full p-2 hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground"
+            aria-label="Toggle navigation menu"
+          >
+            {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+          </button>
         </div>
       </div>
+      {/* Mobile Drawer Dropdown */}
+      {mobileMenuOpen && (
+        <div className="md:hidden border-b border-border bg-background/95 backdrop-blur-xl px-4 py-4 shadow-floating animate-in fade-in slide-in-from-top-4 z-50">
+          <nav className="flex flex-col gap-1.5">
+            {[
+              { label: "Features", href: "#features" },
+              { label: "How it works", href: "#how" },
+              { label: "Demo", href: "#demo" },
+              { label: "Security", href: "#security" },
+            ].map((item) => (
+              <a
+                key={item.label}
+                href={item.href}
+                onClick={() => setMobileMenuOpen(false)}
+                className="rounded-xl px-4 py-2.5 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-secondary transition"
+              >
+                {item.label}
+              </a>
+            ))}
+          </nav>
+        </div>
+      )}
     </header>
   );
 }

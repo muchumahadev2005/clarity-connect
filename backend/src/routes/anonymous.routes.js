@@ -11,10 +11,10 @@ router.post('/send', sendAnonymousEmailLimiter, anonymousController.sendAnonymou
 router.post('/generate-alias', [authMiddleware, generalApiLimiter], anonymousController.generateOrGetAlias);
 
 // Get inbox messages (requires authentication)
-router.get('/inbox', authMiddleware, anonymousController.getInbox);
+router.get('/inbox', [authMiddleware, generalApiLimiter], anonymousController.getInbox);
 
 // Mark message as read (requires authentication)
-router.post('/mark-read/:id', authMiddleware, anonymousController.markRead);
+router.post('/mark-read/:id', [authMiddleware, generalApiLimiter], anonymousController.markRead);
 
 module.exports = router;
 

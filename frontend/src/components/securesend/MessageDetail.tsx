@@ -189,16 +189,18 @@ export function MessageDetail({ message, onDelete, onMarkViewed }: Props) {
     <div className="flex h-full flex-col bg-surface animate-fade-in">
       {/* Header */}
       <div className="flex items-center justify-between border-b border-border bg-foreground px-6 py-4 text-background">
-        <div className="flex flex-col">
+        <div className="flex flex-col min-w-0">
           <h3 className="text-lg font-semibold tracking-tight">Encrypted Message</h3>
-          <div className="flex items-center gap-1.5 text-xs text-background/60">
+          <div className="flex items-center gap-1.5 text-xs text-background/60 min-w-0">
             <span>From</span>
-            <span className="font-medium text-background/90">{message.sender}</span>
+            <span className="font-medium text-background/90 truncate max-w-[100px] min-[375px]:max-w-[160px] sm:max-w-none">
+              {message.sender}
+            </span>
             <span className="opacity-40">·</span>
-            <span>{timeAgo(message.timestamp)}</span>
+            <span className="shrink-0">{timeAgo(message.timestamp)}</span>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1 shrink-0 ml-2">
           <button className="rounded-full p-2 hover:bg-background/10 transition-colors">
             <Reply className="h-4 w-4" />
           </button>

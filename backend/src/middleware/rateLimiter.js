@@ -54,10 +54,17 @@ const sendAnonymousEmailLimiter = createLimiter(
   'Too many email send requests. Please try again in 1 minute.'
 );
 
+const publicMessageLimiter = createLimiter(
+  1 * 60 * 1000,  // 1 minute
+  30,             // 30 requests per minute
+  'Too many requests to read this secure link. Please wait a moment.'
+);
+
 module.exports = {
   createLimiter,
   authLimiter,
   messageLimiter,
   generalApiLimiter,
   sendAnonymousEmailLimiter,
+  publicMessageLimiter,
 };

@@ -14,6 +14,7 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as LandingRouteImport } from './routes/landing'
 import { Route as AnonymousRouteImport } from './routes/anonymous'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as MMessageIdRouteImport } from './routes/m.$messageId'
 
 const SignupRoute = SignupRouteImport.update({
   id: '/signup',
@@ -40,6 +41,11 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const MMessageIdRoute = MMessageIdRouteImport.update({
+  id: '/m/$messageId',
+  path: '/m/$messageId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -47,6 +53,7 @@ export interface FileRoutesByFullPath {
   '/landing': typeof LandingRoute
   '/login': typeof LoginRoute
   '/signup': typeof SignupRoute
+  '/m/$messageId': typeof MMessageIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -54,6 +61,7 @@ export interface FileRoutesByTo {
   '/landing': typeof LandingRoute
   '/login': typeof LoginRoute
   '/signup': typeof SignupRoute
+  '/m/$messageId': typeof MMessageIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -62,13 +70,27 @@ export interface FileRoutesById {
   '/landing': typeof LandingRoute
   '/login': typeof LoginRoute
   '/signup': typeof SignupRoute
+  '/m/$messageId': typeof MMessageIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/anonymous' | '/landing' | '/login' | '/signup'
+  fullPaths:
+    | '/'
+    | '/anonymous'
+    | '/landing'
+    | '/login'
+    | '/signup'
+    | '/m/$messageId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/anonymous' | '/landing' | '/login' | '/signup'
-  id: '__root__' | '/' | '/anonymous' | '/landing' | '/login' | '/signup'
+  to: '/' | '/anonymous' | '/landing' | '/login' | '/signup' | '/m/$messageId'
+  id:
+    | '__root__'
+    | '/'
+    | '/anonymous'
+    | '/landing'
+    | '/login'
+    | '/signup'
+    | '/m/$messageId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -77,6 +99,7 @@ export interface RootRouteChildren {
   LandingRoute: typeof LandingRoute
   LoginRoute: typeof LoginRoute
   SignupRoute: typeof SignupRoute
+  MMessageIdRoute: typeof MMessageIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -116,6 +139,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/m/$messageId': {
+      id: '/m/$messageId'
+      path: '/m/$messageId'
+      fullPath: '/m/$messageId'
+      preLoaderRoute: typeof MMessageIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -125,6 +155,7 @@ const rootRouteChildren: RootRouteChildren = {
   LandingRoute: LandingRoute,
   LoginRoute: LoginRoute,
   SignupRoute: SignupRoute,
+  MMessageIdRoute: MMessageIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

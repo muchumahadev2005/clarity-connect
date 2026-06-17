@@ -120,7 +120,7 @@ function SecureSendApp() {
 
   // Auto-collapse sidebar on small screens.
   useEffect(() => {
-    const mq = window.matchMedia("(max-width: 768px)");
+    const mq = window.matchMedia("(max-width: 1024px)");
     const apply = () => setCollapsed(mq.matches);
     apply();
     mq.addEventListener("change", apply);
@@ -138,8 +138,8 @@ function SecureSendApp() {
   });
 
   const counts: Record<Folder, number> = {
-    inbox: messages.filter((m) => m.folder === "inbox").length,
-    sent: messages.filter((m) => m.folder === "sent").length,
+    inbox: messages.filter((m) => m.folder === "inbox" && m.status !== "expired").length,
+    sent: messages.filter((m) => m.folder === "sent" && m.status !== "expired").length,
     expired: messages.filter((m) => m.status === "expired").length,
     logs: 0,
   };
@@ -150,7 +150,7 @@ function SecureSendApp() {
         return m.status === "expired";
       }
 
-      return m.folder === folder;
+      return m.folder === folder && m.status !== "expired";
     });
 
     if (query.trim()) {
@@ -208,7 +208,7 @@ function SecureSendApp() {
           setFolder(f);
           if (f !== "logs") {
             const first = messages.find((m) =>
-              f === "expired" ? m.status === "expired" : m.folder === f,
+              f === "expired" ? m.status === "expired" : m.folder === f && m.status !== "expired",
             );
             setSelectedId(first?.id ?? null);
           }
@@ -229,8 +229,8 @@ function SecureSendApp() {
           <>
             <div
               className={
-                "shrink-0 border-r border-border md:w-100 md:block " +
-                (selectedId ? "hidden md:block" : "block w-full")
+                "shrink-0 border-r border-border lg:w-80 lg:block " +
+                (selectedId ? "hidden lg:block" : "block w-full")
               }
             >
               <MessageList
@@ -243,12 +243,12 @@ function SecureSendApp() {
                 onToggleSidebar={() => setCollapsed(!collapsed)}
               />
             </div>
-            <div className={"flex-1 overflow-hidden " + (selectedId ? "block" : "hidden md:block")}>
+            <div className={"flex-1 overflow-hidden " + (selectedId ? "block" : "hidden lg:block")}>
               <div className="flex h-full flex-col">
                 {selectedId && (
                   <button
                     onClick={() => setSelectedId(null)}
-                    className="flex items-center gap-2 border-b border-border px-4 py-2 text-sm text-muted-foreground hover:bg-secondary md:hidden"
+                    className="flex items-center gap-2 border-b border-border px-4 py-2 text-sm text-muted-foreground hover:bg-secondary lg:hidden"
                   >
                     <ArrowLeft className="h-4 w-4" /> Back to inbox
                   </button>

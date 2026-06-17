@@ -662,7 +662,7 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
             <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               Protection
             </p>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <div className="grid grid-cols-3 gap-1.5 sm:gap-3">
               {(
                 [
                   { id: "quick", label: "Quick", icon: Sparkles },
@@ -674,7 +674,7 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
                   key={p.id}
                   onClick={() => setProtection(p.id)}
                   className={cn(
-                    "flex flex-col items-center gap-1 rounded-xl border px-3 py-3 text-xs transition",
+                    "flex flex-col items-center gap-1 rounded-xl border px-1.5 py-3 text-[11px] sm:text-xs transition text-center",
                     protection === p.id
                       ? p.id === "hybrid"
                         ? "border-primary bg-linear-to-br from-primary-soft to-[oklch(0.92_0.07_290)] text-primary font-semibold shadow-[0_0_0_4px_oklch(var(--primary)/0.12)]"

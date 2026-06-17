@@ -279,3 +279,48 @@ exports.markViewed = async (req, res, next) => {
     next(err);
   }
 };
+
+exports.getMessageById = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const message = await Message.findById(id);
+    if (!message) {
+      return res.status(404).json({ success: false, message: 'Message not found' });
+    }
+
+    const now = new Date();
+    const isExpired = message.expiresAt && message.expiresAt < now;
+    const responseMessage = message.toObject();
+
+    if (isExpired && (responseMessage.encryptedData || responseMessage.encryptedAESKey || responseMessage.iv || responseMessage.password || responseMessage.fileUrl)) {
+      await wipeMessagePayload(message);
+      syncWipedPayloadToResponse(responseMessage);
+    }
+
+    if (!isExpired && !responseMessage.encryptedData && responseMessage.fileUrl) {
+      responseMessage.encryptedData = await loadEncryptedPayload(responseMessage.fileUrl);
+    }
+
+    res.status(200).json({
+      success: true,
+      data: {
+        _id: responseMessage._id,
+        senderId: responseMessage.senderId,
+        receiverId: responseMessage.receiverId,
+        type: responseMessage.type,
+        protection: responseMessage.protection,
+        password: responseMessage.password,
+        viewOnce: responseMessage.viewOnce,
+        expiresAt: responseMessage.expiresAt,
+        views: responseMessage.views,
+        createdAt: responseMessage.createdAt,
+        encryptedData: responseMessage.encryptedData,
+        encryptedAESKey: responseMessage.encryptedAESKey,
+        iv: responseMessage.iv,
+        fileUrl: responseMessage.fileUrl,
+      }
+    });
+  } catch (err) {
+    next(err);
+  }
+};
