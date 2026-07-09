@@ -67,18 +67,20 @@ const allowedOrigins = [
   'https://clarity-connect.onrender.com',
   'https://clarity-connect-gray.vercel.app',
   'https://clarity-connect.pages.dev',
+  'https://clarity-connect.mahadevmuchu1.workers.dev',
   'https://securesend.co.in',
   'https://www.securesend.co.in',
 ];
 
-// Also allow any *.vercel.app or *.pages.dev subdomain for preview deploys
+// Also allow any *.vercel.app, *.pages.dev, or *.workers.dev subdomain for preview deploys
 app.use(cors({
   origin: (origin, callback) => {
     if (!origin) return callback(null, true); // allow non-browser (Postman, curl)
     if (
       allowedOrigins.includes(origin) ||
       /\.vercel\.app$/.test(origin) ||
-      /\.pages\.dev$/.test(origin)
+      /\.pages\.dev$/.test(origin) ||
+      /\.workers\.dev$/.test(origin)
     ) {
       return callback(null, true);
     }
