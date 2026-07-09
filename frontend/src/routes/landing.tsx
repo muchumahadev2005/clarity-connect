@@ -26,30 +26,11 @@ import { Input } from "@/components/ui/input";
 
 export const Route = createFileRoute("/landing")({
   beforeLoad: () => {
-    if (typeof window !== "undefined" && localStorage.getItem("isLoggedIn") === "true") {
-      throw redirect({ to: "/" });
-    }
+    throw redirect({ to: "/" });
   },
-  component: LandingPage,
-  head: () => ({
-    meta: [
-      { title: "SecureSend — Send messages only they can read" },
-      {
-        name: "description",
-        content:
-          "End-to-end encrypted messaging with hybrid AES + RSA, view-once links, self-destruct timers, and anonymous sharing.",
-      },
-      { property: "og:title", content: "SecureSend — Send messages only they can read" },
-      {
-        property: "og:description",
-        content:
-          "Privacy-first encrypted messaging. Keys stay in your browser. No plaintext storage. Ever.",
-      },
-    ],
-  }),
 });
 
-function LandingPage() {
+export function LandingPage() {
   const { scrollYProgress } = useScroll();
   const scaleX = useSpring(scrollYProgress, {
     stiffness: 100,

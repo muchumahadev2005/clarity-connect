@@ -1,4 +1,4 @@
-import { createFileRoute, Link, redirect } from "@tanstack/react-router";
+import { createFileRoute, Link, redirect, useNavigate } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { Toaster, toast } from "sonner";
 import {
@@ -19,7 +19,7 @@ import { timeAgo } from "@/components/securesend/utils";
 export const Route = createFileRoute("/anonymous")({
   beforeLoad: () => {
     if (typeof window !== "undefined" && localStorage.getItem("isLoggedIn") !== "true") {
-      throw redirect({ to: "/landing" });
+      throw redirect({ to: "/" });
     }
   },
   component: AnonymousMail,
@@ -47,6 +47,23 @@ interface AnonEmail {
 }
 
 function AnonymousMail() {
+  const navigate = useNavigate();
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const isLoggedIn = localStorage.getItem("isLoggedIn") === "true";
+      const token = localStorage.getItem("token");
+      if (!isLoggedIn || !token) {
+        navigate({ to: "/", replace: true });
+      }
+    }
+  }, [navigate]);
+
   const [view, setView] = useState<View>("dashboard");
   const [inbox, setInbox] = useState<AnonEmail[]>([]);
   const [openEmail, setOpenEmail] = useState<AnonEmail | null>(null);
@@ -115,11 +132,15 @@ function AnonymousMail() {
 
   // Generate or retrieve alias on component mount
   useEffect(() => {
+    const isLoggedIn = localStorage.getItem("isLoggedIn") === "true";
+    if (!isLoggedIn) return;
     loadOrCreateAlias();
   }, []);
 
   // Fetch inbox whenever view changes to inbox
   useEffect(() => {
+    const isLoggedIn = localStorage.getItem("isLoggedIn") === "true";
+    if (!isLoggedIn) return;
     if (view === "inbox") {
       fetchInbox();
     }
@@ -171,6 +192,10 @@ function AnonymousMail() {
       setSending(false);
     }
   };
+  const isLoggedIn = typeof window !== "undefined" && localStorage.getItem("isLoggedIn") === "true" && !!localStorage.getItem("token");
+  if (!isClient || !isLoggedIn) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-background text-foreground">

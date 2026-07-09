@@ -1,4 +1,4 @@
-import { createFileRoute, redirect } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { Toaster } from "sonner";
 import { ArrowLeft } from "lucide-react";
@@ -12,17 +12,19 @@ import { initialMessages } from "@/components/securesend/mockData";
 import type { Folder, SecureMessage } from "@/components/securesend/types";
 import api from "@/lib/api";
 import { toast } from "sonner";
+import { LandingPage } from "./landing";
 
 export const Route = createFileRoute("/")({
-  beforeLoad: () => {
-    if (typeof window !== "undefined" && localStorage.getItem("isLoggedIn") !== "true") {
-      throw redirect({ to: "/landing" });
-    }
-  },
   component: SecureSendApp,
 });
 
 function SecureSendApp() {
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
   const [messages, setMessages] = useState<SecureMessage[]>(initialMessages);
   const [folder, setFolder] = useState<Folder>("inbox");
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -33,6 +35,11 @@ function SecureSendApp() {
 
   // Fetch real messages and user profile from backend
   useEffect(() => {
+    if (typeof window === "undefined") return;
+    const isLoggedIn = localStorage.getItem("isLoggedIn") === "true";
+    const token = localStorage.getItem("token");
+    if (!isLoggedIn || !token) return;
+
     const fetchAppContent = async () => {
       try {
         const [inRes, outRes, userRes] = await Promise.all([
@@ -235,6 +242,10 @@ function SecureSendApp() {
       console.error("Failed to mark message as viewed", err);
     }
   };
+  const isLoggedIn = typeof window !== "undefined" && localStorage.getItem("isLoggedIn") === "true" && !!localStorage.getItem("token");
+  if (!isClient || !isLoggedIn) {
+    return <LandingPage />;
+  }
 
   return (
     <div className="flex h-screen w-full overflow-hidden bg-background text-foreground">
