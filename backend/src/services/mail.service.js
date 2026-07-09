@@ -71,6 +71,10 @@ const throwResendError = (error, fallbackMessage) => {
 };
 
 const sendOtpEmail = async (email, otp) => {
+  const provider = String(process.env.AUTH_EMAIL_PROVIDER || 'resend').toLowerCase();
+  if (provider === 'smtp') {
+    return sendOtpEmailViaSmtp(email, otp);
+  }
   return sendOtpEmailViaResend(email, otp);
 };
 
