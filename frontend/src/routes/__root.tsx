@@ -29,6 +29,7 @@ export const Route = createRootRoute({
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
+      { name: "google-site-verification", content: "p0jC4vLcw-UZ1lcemrSPr_TFokrtCwS-TdLutTVxAj8" },
       { title: "SecureSend — Universal Secure Communication" },
       { name: "description", content: "Encrypt messages, voice notes, and files. Share with password, expiry, and view-once links." },
       { property: "og:title", content: "SecureSend — Universal Secure Communication" },
