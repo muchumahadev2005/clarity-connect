@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { Toaster, toast } from "sonner";
 import {
@@ -17,6 +17,11 @@ import api from "@/lib/api";
 import { timeAgo } from "@/components/securesend/utils";
 
 export const Route = createFileRoute("/anonymous")({
+  beforeLoad: () => {
+    if (typeof window !== "undefined" && localStorage.getItem("isLoggedIn") !== "true") {
+      throw redirect({ to: "/landing" });
+    }
+  },
   component: AnonymousMail,
   head: () => ({
     meta: [
