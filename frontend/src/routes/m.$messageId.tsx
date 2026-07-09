@@ -49,10 +49,18 @@ function MessageViewerPage() {
         logs: [],
         encrypted: hasEncryptedPayload
           ? {
-              encryptedData: m.encryptedData,
-              encryptedAESKey: m.encryptedAESKey,
-              iv: m.iv,
-            }
+            encryptedData: m.encryptedData,
+            encryptedAESKey: m.encryptedAESKey,
+            iv: m.iv,
+            salt: m.salt,
+            keyIv: m.keyIv,
+            encryptionMode: m.encryptionMode,
+            kdf: m.kdf,
+            kdfIterations: m.kdfIterations,
+            aesAlgorithm: m.aesAlgorithm,
+            rsaAlgorithm: m.rsaAlgorithm,
+            mode: "hybrid",
+          }
           : undefined,
       };
 

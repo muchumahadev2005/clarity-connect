@@ -24,13 +24,12 @@ import {
 import api from "@/lib/api";
 import type { MessageType, ProtectionMode } from "./types";
 import { cn } from "@/lib/utils";
-import { UserSearch } from "./UserSearch";
-
 import { HybridSteps } from "./HybridSteps";
 import {
   hybridEncrypt,
   importPublicKey,
   loadOrCreateRSAKeyPair,
+  normalizeSecretKey,
   symmetricEncrypt,
 } from "./crypto";
 import type { EncryptedPayload } from "./types";
@@ -60,7 +59,7 @@ interface Props {
     recipient: string | null;
     attachmentName?: string;
     encrypted: EncryptedPayload;
-  }) => void;
+  }) => void | Promise<void>;
 }
 
 const expiries = [
@@ -71,8 +70,30 @@ const expiries = [
   { label: "1 day", value: 1440 },
 ];
 
-const MAX_VOICE_SIZE_BYTES = 50 * 1024 * 1024;
-const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024;
+// ── Hard limits ──────────────────────────────────────────────────────────────
+const MAX_VOICE_SIZE_BYTES  = 8 * 1024 * 1024;   // 8 MB
+const MAX_FILE_SIZE_BYTES   = 8 * 1024 * 1024;   // 8 MB
+const MAX_RECORDING_SECS    = 10;                 // 10-second cap
+
+// ── Quota helpers (localStorage) ─────────────────────────────────────────────
+function getTodayKey(prefix: string) {
+  return `${prefix}_${new Date().toISOString().slice(0, 10)}`;
+}
+function getHourKey(prefix: string) {
+  const d = new Date();
+  return `${prefix}_${d.toISOString().slice(0, 13)}`; // YYYY-MM-DDTHH
+}
+function getCount(key: string) {
+  return parseInt(localStorage.getItem(key) || "0", 10);
+}
+function bumpCount(key: string) {
+  const n = getCount(key) + 1;
+  localStorage.setItem(key, String(n));
+  return n;
+}
+
+const DAILY_FILE_LIMIT   = 5;   // file sends per day
+const HOURLY_VOICE_LIMIT = 2;   // voice sends per hour
 
 export function ComposeModal({ open, onClose, onEncrypt }: Props) {
   const [tab, setTab] = useState<MessageType>("text");
@@ -84,8 +105,10 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
   const [recording, setRecording] = useState(false);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [audioFileName, setAudioFileName] = useState<string | null>(null);
+  const [recordingSecs, setRecordingSecs] = useState(0); // countdown display
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
+  const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const audioUploadInputRef = useRef<HTMLInputElement | null>(null);
 
   const isMp3File = (file: File) => {
@@ -109,7 +132,7 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
     if (file.size > MAX_VOICE_SIZE_BYTES) {
       setAudioBlob(null);
       setAudioFileName(null);
-      toast.error("Audio is too large. Maximum allowed size is 50 MB.");
+      toast.error(`Audio is too large. Maximum allowed size is ${MAX_VOICE_SIZE_BYTES / 1024 / 1024} MB.`);
       e.target.value = "";
       return;
     }
@@ -119,10 +142,19 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
     toast.success("MP3 ready to send securely");
   };
 
+  const stopRecording = () => {
+    mediaRecorderRef.current?.stop();
+    setRecording(false);
+    setRecordingSecs(0);
+    if (recordingTimerRef.current) {
+      clearInterval(recordingTimerRef.current);
+      recordingTimerRef.current = null;
+    }
+  };
+
   const toggleRecording = async () => {
     if (recording) {
-      mediaRecorderRef.current?.stop();
-      setRecording(false);
+      stopRecording();
     } else {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -139,23 +171,36 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
           if (blob.size > MAX_VOICE_SIZE_BYTES) {
             setAudioBlob(null);
             setAudioFileName(null);
-            toast.error("Audio is too large. Maximum allowed size is 50 MB.");
-            stream.getTracks().forEach((track) => track.stop());
+            toast.error(`Audio is too large. Maximum allowed size is ${MAX_VOICE_SIZE_BYTES / 1024 / 1024} MB.`);
+            stream.getTracks().forEach((t) => t.stop());
             return;
           }
           setAudioBlob(blob);
           setAudioFileName(null);
-          stream.getTracks().forEach((track) => track.stop());
+          stream.getTracks().forEach((t) => t.stop());
         };
 
         recorder.start();
         setRecording(true);
+        setRecordingSecs(0);
+
+        // Auto-stop at MAX_RECORDING_SECS and show live countdown
+        let elapsed = 0;
+        recordingTimerRef.current = setInterval(() => {
+          elapsed += 1;
+          setRecordingSecs(elapsed);
+          if (elapsed >= MAX_RECORDING_SECS) {
+            stopRecording();
+            toast.info(`Recording capped at ${MAX_RECORDING_SECS} seconds.`);
+          }
+        }, 1000);
       } catch (err) {
         console.error("Error accessing microphone:", err);
         toast.error("Could not access microphone");
       }
     }
   };
+
   const [fileName, setFileName] = useState<string | null>(null);
   const [fileToEncrypt, setFileToEncrypt] = useState<File | null>(null);
   const [sendMode, setSendMode] = useState<"link" | "direct">("link");
@@ -167,35 +212,8 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
   // Hybrid mode state
   const [hybridReceiver, setHybridReceiver] = useState("");
   const [hybridReceiverPubKey, setHybridReceiverPubKey] = useState("");
-  const [ownPublicKey, setOwnPublicKey] = useState<string>("");
-  const [ownKeyCopied, setOwnKeyCopied] = useState(false);
   const [aesKeyPreview, setAesKeyPreview] = useState("");
   const [rsaWrappedKeyPreview, setRsaWrappedKeyPreview] = useState("");
-
-  // Load (or generate) the user's RSA key pair the first time hybrid is opened.
-  useEffect(() => {
-    if (protection !== "hybrid" || ownPublicKey) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const { publicKeyB64 } = await loadOrCreateRSAKeyPair();
-        if (!cancelled) {
-          setOwnPublicKey(publicKeyB64);
-          // Sync key to backend
-          try {
-            await api.post("/keys/register", { publicKey: publicKeyB64 });
-          } catch (err) {
-            console.error("Failed to sync public key", err);
-          }
-        }
-      } catch (e) {
-        console.error(e);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [protection, ownPublicKey]);
 
   // Auto-fetch receiver's public key when email is entered in hybrid mode
   useEffect(() => {
@@ -255,27 +273,19 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
     return () => clearTimeout(timer);
   }, [hybridReceiver, protection]);
 
-  const copyOwnKey = async () => {
-    if (!ownPublicKey) return;
-    try {
-      await navigator.clipboard.writeText(ownPublicKey);
-      setOwnKeyCopied(true);
-      setTimeout(() => setOwnKeyCopied(false), 1600);
-    } catch {
-      /* ignore */
-    }
-  };
-
   // Auto-generate a secret key when "key" mode is selected and field is empty.
   useEffect(() => {
-    if (protection === "key" && !password) {
+    if (protection === "key") {
+      // Auto-generate a fresh key whenever switching into key mode.
       setPassword(generateSecretKey());
       setKeyPulse(true);
       setTimeout(() => setKeyPulse(false), 700);
       setTimeout(() => keyInputRef.current?.focus(), 50);
+    } else {
+      // Clear whatever was in the password field when switching to any other
+      // mode — prevents the auto-generated key leaking into the Password field.
+      setPassword("");
     }
-    // Clear password when leaving protected modes
-    if (protection === "quick") setPassword("");
   }, [protection]);
 
   const regenerateKey = () => {
@@ -321,7 +331,13 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
         : password.length < 6
           ? "Use a stronger key"
           : null
-      : null;
+      : protection === "password"
+        ? !password
+          ? "Password is required"
+          : password.length < 6
+            ? "Use a stronger password"
+            : null
+        : null;
 
   if (!open) return null;
 
@@ -338,7 +354,6 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
     setFileName(null);
     setFileToEncrypt(null);
     setSendMode("link");
-    setRecipient(null);
     setEncStep(0);
     setHybridReceiver("");
     setHybridReceiverPubKey("");
@@ -349,13 +364,29 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
   const submit = async () => {
     let finalContent = text;
     let attachmentName: string | undefined;
+
+    // Enforce quotas
+    if (tab === "file") {
+      const dailyKey = getTodayKey("file_sends");
+      if (getCount(dailyKey) >= DAILY_FILE_LIMIT) {
+        toast.error(`Daily limit reached. You can only send ${DAILY_FILE_LIMIT} files per day.`);
+        return;
+      }
+    } else if (tab === "voice") {
+      const hourlyKey = getHourKey("voice_sends");
+      if (getCount(hourlyKey) >= HOURLY_VOICE_LIMIT) {
+        toast.error(`Hourly limit reached. You can only send ${HOURLY_VOICE_LIMIT} voice messages per hour.`);
+        return;
+      }
+    }
+
     if (tab === "voice") {
       if (!audioBlob) {
         toast.error("Please record audio or upload an MP3 file first");
         return;
       }
       if (audioBlob.size > MAX_VOICE_SIZE_BYTES) {
-        toast.error("Audio is too large. Maximum allowed size is 50 MB.");
+        toast.error(`Audio is too large. Maximum allowed size is ${MAX_VOICE_SIZE_BYTES / 1024 / 1024} MB.`);
         return;
       }
       const reader = new FileReader();
@@ -370,7 +401,7 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
         return;
       }
       if (fileToEncrypt.size > MAX_FILE_SIZE_BYTES) {
-        toast.error("File is too large. Maximum allowed size is 50 MB.");
+        toast.error(`File is too large. Maximum allowed size is ${MAX_FILE_SIZE_BYTES / 1024 / 1024} MB.`);
         return;
       }
       attachmentName = fileToEncrypt.name;
@@ -389,7 +420,13 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
     }
 
     if (!finalContent.trim()) return;
-    if (sendMode === "direct" && !recipient) {
+    if (keyError) {
+      toast.error(keyError);
+      return;
+    }
+    const resolvedRecipient = hybridReceiver.trim();
+
+    if (sendMode === "direct" && !resolvedRecipient) {
       toast.error("Select a user before sending directly");
       return;
     }
@@ -411,13 +448,14 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
       let encrypted: EncryptedPayload;
       if (protection === "key" || protection === "password") {
         setEncStep(2);
+        const secret = protection === "key" ? normalizeSecretKey(password) : password;
         const envelope = JSON.stringify({
           v: 1,
           protection,
-          password: password || null,
+          password: secret || null,
           body: finalContent,
         });
-        const base = await symmetricEncrypt(envelope, password, (aesBase64, wrappedBase64) => {
+        const base = await symmetricEncrypt(envelope, secret, (aesBase64, wrappedBase64) => {
           setAesKeyPreview(aesBase64);
           setRsaWrappedKeyPreview(wrappedBase64);
         });
@@ -448,10 +486,16 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
           password: password || null,
           body: finalContent,
         });
-        const base = await hybridEncrypt(envelope, publicKey, (aesBase64, wrappedBase64) => {
-          setAesKeyPreview(aesBase64);
-          setRsaWrappedKeyPreview(wrappedBase64);
-        });
+        const base =
+          protection === "hybrid"
+            ? await hybridEncrypt(envelope, publicKey, (aesBase64, wrappedBase64) => {
+                setAesKeyPreview(aesBase64);
+                setRsaWrappedKeyPreview(wrappedBase64);
+              })
+            : await hybridEncrypt(envelope, publicKey, (aesBase64, wrappedBase64) => {
+                setAesKeyPreview(aesBase64);
+                setRsaWrappedKeyPreview(wrappedBase64);
+              });
         encrypted = {
           ...base,
           mode: "hybrid",
@@ -461,19 +505,27 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
       setEncStep(3);
       await new Promise((r) => setTimeout(r, 2500)); // Pause briefly so user can read the AES key and see the encryption in action
       setEncStep(4);
-      onEncrypt({
+      await onEncrypt({
         type: tab,
         content: finalContent,
         protection,
-        password: protection === "hybrid" ? "" : password,
+        password: protection === "hybrid" ? "" : protection === "key" ? normalizeSecretKey(password) : password,
         expiry,
         viewOnce,
         link,
         sendMode,
-        recipient: sendMode === "direct" ? recipient : null,
+        recipient: sendMode === "direct" ? resolvedRecipient : null,
         attachmentName,
         encrypted,
       });
+
+      // Bump quotas
+      if (tab === "file") {
+        bumpCount(getTodayKey("file_sends"));
+      } else if (tab === "voice") {
+        bumpCount(getHourKey("voice_sends"));
+      }
+
       reset();
     } catch (err) {
       console.error("Hybrid encryption failed", err);
@@ -487,7 +539,7 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:justify-end sm:p-6 animate-fade-in">
+    <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-6 animate-fade-in">
       <div className="absolute inset-0 bg-foreground/30 backdrop-blur-sm" onClick={onClose} />
       <div className="relative z-10 flex h-[88vh] w-full max-w-xl flex-col overflow-hidden rounded-t-2xl bg-surface shadow-floating sm:h-auto sm:max-h-[90vh] sm:rounded-2xl animate-slide-up">
         {/* Header */}
@@ -530,26 +582,6 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
 
         {/* Body */}
         <div className="flex-1 overflow-y-auto scrollbar-thin px-5 py-4 space-y-4">
-          {/* Hybrid encryption banner */}
-          <div className="flex items-start gap-2.5 rounded-xl border border-primary/25 bg-primary-soft/60 px-3.5 py-2.5">
-            <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-            <div className="min-w-0 flex-1">
-              <p className="flex items-center gap-1.5 text-xs font-semibold text-primary">
-                Hybrid Encryption Enabled (AES + RSA)
-                <span
-                  className="group relative inline-flex"
-                  title="Your message is encrypted using AES. The encryption key is secured using RSA."
-                >
-                  <Info className="h-3 w-3 opacity-70" />
-                </span>
-              </p>
-              <p className="text-[11px] text-muted-foreground">
-                Your message is encrypted with AES. The key is secured using RSA so only the
-                receiver can decrypt it.
-              </p>
-            </div>
-          </div>
-
           {encStep > 0 && (
             <div className="animate-fade-in">
               <HybridSteps 
@@ -584,7 +616,7 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
               </button>
               <p className="mt-3 text-sm text-muted-foreground">
                 {recording
-                  ? "Recording… tap to stop"
+                  ? `Recording… ${MAX_RECORDING_SECS - recordingSecs}s remaining`
                   : audioBlob
                     ? audioFileName
                       ? `Selected: ${audioFileName}`
@@ -632,7 +664,7 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
               <p className="mt-2 text-sm font-medium">
                 {fileName ?? "Click or drop a file to encrypt"}
               </p>
-              <p className="text-xs text-muted-foreground">Max 50 MB · Encrypted in your browser</p>
+              <p className="text-xs text-muted-foreground">Max 8 MB · Encrypted in your browser</p>
               <input
                 type="file"
                 className="hidden"
@@ -644,7 +676,7 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
                     return;
                   }
                   if (selected.size > MAX_FILE_SIZE_BYTES) {
-                    toast.error("File is too large. Maximum allowed size is 50 MB.");
+                    toast.error(`File is too large. Maximum allowed size is ${MAX_FILE_SIZE_BYTES / 1024 / 1024} MB.`);
                     setFileName(null);
                     setFileToEncrypt(null);
                     e.target.value = "";
@@ -662,12 +694,13 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
             <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               Protection
             </p>
-            <div className="grid grid-cols-3 gap-1.5 sm:gap-3">
+            <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4 sm:gap-3">
               {(
                 [
                   { id: "quick", label: "Quick", icon: Sparkles },
                   { id: "key", label: "Secret Key", icon: KeyRound },
-                  { id: "hybrid", label: "Hybrid 🔐", icon: ShieldCheck },
+                  { id: "password", label: "Password", icon: Lock },
+                  { id: "hybrid", label: "Hybrid", icon: ShieldCheck },
                 ] as const
               ).map((p) => (
                 <button
@@ -689,16 +722,6 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
             </div>
             {protection === "hybrid" && (
               <div className="mt-3 space-y-3 animate-fade-in">
-                <div className="rounded-xl border border-primary/30 bg-linear-to-br from-primary-soft/70 to-[oklch(0.95_0.05_290)] p-3.5">
-                  <div className="flex items-center gap-2 text-xs font-semibold text-primary">
-                    <ShieldCheck className="h-4 w-4" /> Hybrid Encryption Enabled
-                  </div>
-                  <p className="mt-1 text-[11px] text-muted-foreground">
-                    AES + RSA secure encryption. Only the intended receiver can decrypt this
-                    message.
-                  </p>
-                </div>
-
                 <div>
                   <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                     Receiver
@@ -709,87 +732,6 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
                     placeholder="Enter receiver email (public key will auto-load)"
                     className="w-full rounded-xl border border-border bg-surface px-3.5 py-2.5 text-sm outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/15"
                   />
-                </div>
-
-                <div>
-                  <label className="mb-1 flex items-center justify-between text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                    <span>Public Key (Auto-loaded)</span>
-                    <button
-                      type="button"
-                      onClick={() => setHybridReceiverPubKey("")}
-                      className="text-[10px] text-destructive hover:underline"
-                    >
-                      Clear
-                    </button>
-                  </label>
-                  <textarea
-                    value={hybridReceiverPubKey}
-                    onChange={(e) => setHybridReceiverPubKey(e.target.value)}
-                    placeholder="Public key will load automatically when you enter a valid email..."
-                    rows={3}
-                    spellCheck={false}
-                    className="w-full resize-none rounded-xl border border-border bg-surface-muted px-3.5 py-2.5 font-mono text-[11px] leading-relaxed outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/15"
-                  />
-                  <p className="mt-1 text-[11px] text-muted-foreground">
-                    Public key is automatically fetched from the database when you enter the receiver email.
-                  </p>
-                </div>
-
-                <div className="rounded-xl border border-border bg-surface-muted p-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                      Your Public Key
-                    </span>
-                    <div className="flex items-center gap-1">
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          try {
-                            // Delete from backend database
-                            await api.delete('/keys/clear', {
-                              headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-                            });
-                            
-                            // Clear from localStorage
-                            const userEmail = localStorage.getItem('userEmail');
-                            localStorage.removeItem(`securesend.rsa.publicKey.${userEmail}`);
-                            localStorage.removeItem(`securesend.rsa.privateKey.${userEmail}`);
-                            
-                            setOwnPublicKey('');
-                            toast.success('✅ Public key cleared from database and device. Close and reopen hybrid mode to generate new unique key.');
-                          } catch (err) {
-                            console.error('Failed to clear key', err);
-                            toast.error('Failed to clear public key');
-                          }
-                        }}
-                        className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-medium text-destructive transition hover:bg-red-50 border border-destructive/20"
-                      >
-                        🔄 Regenerate New Key
-                      </button>
-                      <button
-                        type="button"
-                        onClick={copyOwnKey}
-                        disabled={!ownPublicKey}
-                        className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-medium text-primary transition hover:bg-primary-soft disabled:opacity-50"
-                      >
-                        {ownKeyCopied ? (
-                          <>
-                            <Check className="h-3 w-3" /> Copied
-                          </>
-                        ) : (
-                          <>
-                            <Copy className="h-3 w-3" /> Copy Public Key
-                          </>
-                        )}
-                      </button>
-                    </div>
-                  </div>
-                  <p className="mt-1.5 max-h-20 overflow-auto break-all font-mono text-[10px] leading-relaxed text-foreground/70">
-                    {ownPublicKey || "Generating your secure key…"}
-                  </p>
-                  <p className="mt-1.5 text-[11px] text-muted-foreground">
-                    Share this with anyone who wants to send you a hybrid-encrypted message.
-                  </p>
                 </div>
               </div>
             )}
@@ -859,6 +801,37 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
                   <p className="text-[11px] text-muted-foreground">
                     🔐 This key is required to decrypt the message. Share it separately with the
                     recipient.
+                  </p>
+                )}
+              </div>
+            )}
+            {protection === "password" && (
+              <div className="mt-3 space-y-2 animate-fade-in">
+                <div className="inline-flex items-center gap-1.5 rounded-full bg-primary-soft px-2.5 py-1 text-[11px] font-medium text-primary ring-1 ring-primary/20">
+                  <Lock className="h-3 w-3" /> Password Protected
+                </div>
+                <div
+                  className={cn(
+                    "flex items-stretch gap-2 rounded-xl border bg-surface p-1.5 transition-all",
+                    "border-border focus-within:border-primary focus-within:shadow-[0_0_0_4px_oklch(var(--primary)/0.12)]",
+                  )}
+                >
+                  <div className="flex items-center pl-2 text-primary">
+                    <Lock className="h-4 w-4" />
+                  </div>
+                  <input
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    type="password"
+                    placeholder="Enter a password"
+                    className="min-w-0 flex-1 rounded-lg bg-transparent px-2 py-2 text-sm outline-none placeholder:text-muted-foreground/60"
+                  />
+                </div>
+                {keyError ? (
+                  <p className="text-[11px] font-medium text-destructive">{keyError}</p>
+                ) : (
+                  <p className="text-[11px] text-muted-foreground">
+                    🔐 The recipient will need this password to decrypt the message.
                   </p>
                 )}
               </div>
@@ -954,17 +927,16 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
               ))}
             </div>
 
-            {sendMode === "direct" && (
-              <div className="mt-2 animate-fade-in">
-                <UserSearch
-                  selected={recipient}
-                  protection={protection}
-                  onSelect={(email, publicKey) => {
-                    setRecipient(email);
-                    setHybridReceiver(email || "");
-                    if (publicKey) setHybridReceiverPubKey(publicKey);
-                    if (!email) setHybridReceiverPubKey("");
-                  }}
+            {sendMode === "direct" && protection !== "hybrid" && (
+              <div className="mt-2">
+                <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                  Receiver
+                </label>
+                <input
+                  value={hybridReceiver}
+                  onChange={(e) => setHybridReceiver(e.target.value)}
+                  placeholder="Enter receiver email (public key will auto-load)"
+                  className="w-full rounded-xl border border-border bg-surface px-3.5 py-2.5 text-sm outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/15"
                 />
               </div>
             )}
@@ -981,7 +953,7 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
           </span>
           <button
             onClick={submit}
-            disabled={(sendMode === "direct" && !recipient) || encStep > 0}
+            disabled={encStep > 0}
             className="inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground shadow-elegant transition-all hover:opacity-95 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <ShieldCheck className="h-4 w-4" />

@@ -47,6 +47,12 @@ function SecureSendApp() {
           const isExpired = Boolean(m.expiresAt && new Date(m.expiresAt) < new Date());
           const isDestructed = isExpired || Boolean(m.viewOnce && (m.views || 0) > 0);
           const hasEncryptedPayload = Boolean(m.encryptedData && m.encryptedAESKey && m.iv);
+          const logs = (m.logs || []).map((l: any) => ({
+            viewedAt: l.viewedAt || l.createdAt || new Date().toISOString(),
+            ip: l.ip || l.ipAddress || "Unknown IP",
+            device: l.device || "Unknown device",
+            viewer: l.viewer || l.userId?.email || undefined,
+          }));
 
           return {
           id: m._id,
@@ -69,12 +75,20 @@ function SecureSendApp() {
           status: isDestructed ? "expired" : "new",
           timestamp: m.createdAt,
           views: m.views || 0,
-          logs: m.logs || [],
+          logs,
           encrypted: hasEncryptedPayload
             ? {
                 encryptedData: m.encryptedData,
                 encryptedAESKey: m.encryptedAESKey,
                 iv: m.iv,
+                salt: m.salt,
+                keyIv: m.keyIv,
+                encryptionMode: m.encryptionMode,
+                kdf: m.kdf,
+                kdfIterations: m.kdfIterations,
+                aesAlgorithm: m.aesAlgorithm,
+                rsaAlgorithm: m.rsaAlgorithm,
+                mode: "hybrid",
               }
             : undefined,
           } as SecureMessage;
@@ -141,7 +155,9 @@ function SecureSendApp() {
     inbox: messages.filter((m) => m.folder === "inbox" && m.status !== "expired").length,
     sent: messages.filter((m) => m.folder === "sent" && m.status !== "expired").length,
     expired: messages.filter((m) => m.status === "expired").length,
-    logs: 0,
+    logs: messages
+      .filter((m) => m.folder === "sent")
+      .reduce((total, m) => total + m.logs.length, 0),
   };
 
   const filtered = useMemo(() => {
@@ -276,6 +292,13 @@ function SecureSendApp() {
               encryptedData: p.encrypted.encryptedData,
               encryptedAESKey: p.encrypted.encryptedAESKey,
               iv: p.encrypted.iv,
+              salt: p.encrypted.salt,
+              keyIv: p.encrypted.keyIv,
+              encryptionMode: p.encrypted.encryptionMode,
+              kdf: p.encrypted.kdf,
+              kdfIterations: p.encrypted.kdfIterations,
+              aesAlgorithm: p.encrypted.aesAlgorithm,
+              rsaAlgorithm: p.encrypted.rsaAlgorithm,
               type: p.type,
               protection: p.protection,
               password: p.password,
@@ -326,7 +349,7 @@ function SecureSendApp() {
                       : p.protection === "key"
                         ? "Secret key"
                         : p.protection === "hybrid"
-                          ? "Hybrid 🔐"
+                          ? "Hybrid"
                           : "Quick",
                   expiry:
                     p.expiry < 1
@@ -340,6 +363,7 @@ function SecureSendApp() {
             }
           } catch (err: any) {
             toast.error(err.response?.data?.message || "Failed to send message. Please try again.");
+            throw err;
           }
         }}
       />

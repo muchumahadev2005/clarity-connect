@@ -27,8 +27,8 @@ const createLimiter = (windowMs = 15 * 60 * 1000, max = 100, message = 'Too many
 // Specialized limiters for different parts of the app
 const authLimiter = createLimiter(
   15 * 60 * 1000, // 15 minutes
-  10,             // 10 attempts
-  'Too many authentication attempts. Please try again after 15 minutes.'
+  5,              // 5 attempts max (brute force protection)
+  'Too many login or OTP attempts. Please try again after 15 minutes.'
 );
 
 const messageLimiter = createLimiter(
@@ -56,7 +56,7 @@ const sendAnonymousEmailLimiter = createLimiter(
 
 const publicMessageLimiter = createLimiter(
   1 * 60 * 1000,  // 1 minute
-  30,             // 30 requests per minute
+  5,              // 5 requests per minute max (prevent automated scanning/guessing)
   'Too many requests to read this secure link. Please wait a moment.'
 );
 

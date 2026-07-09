@@ -2,6 +2,7 @@ import { Inbox, Send, TimerOff, Activity, ShieldCheck, Plus, Menu, VenetianMask,
 import { Link, useNavigate } from "@tanstack/react-router";
 import type { Folder } from "./types";
 import { cn } from "@/lib/utils";
+import { clearStoredRSAKeys } from "./crypto";
 
 const items: { key: Folder; label: string; icon: typeof Inbox }[] = [
   { key: "inbox", label: "Inbox", icon: Inbox },
@@ -26,8 +27,7 @@ export function Sidebar({ active, onSelect, onCompose, counts, collapsed, onTogg
   const handleLogout = () => {
     localStorage.removeItem("isLoggedIn");
     localStorage.removeItem("token");
-    localStorage.removeItem("securesend.rsa.publicKey");
-    localStorage.removeItem("securesend.rsa.privateKey");
+    clearStoredRSAKeys();
     navigate({ to: "/landing" });
   };
 
@@ -47,8 +47,8 @@ export function Sidebar({ active, onSelect, onCompose, counts, collapsed, onTogg
           "flex flex-col border-r border-border bg-surface transition-all duration-300 ease-in-out z-50",
           "fixed inset-y-0 left-0 lg:static",
           collapsed 
-            ? "-translate-x-full lg:translate-x-0 lg:w-[72px]" 
-            : "translate-x-0 w-[280px]",
+            ? "-translate-x-full lg:translate-x-0 lg:w-18" 
+            : "translate-x-0 w-70",
         )}
       >
         <div className="flex items-center gap-2 px-4 py-4">

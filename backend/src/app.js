@@ -8,7 +8,7 @@ const anonymousRoutes = require('./routes/anonymous.routes');
 const mailRoutes = require('./routes/mail.routes');
 
 const app = express();
-const requestLimitMb = Number(process.env.REQUEST_LIMIT_MB || 110);
+const requestLimitMb = Number(process.env.REQUEST_LIMIT_MB || 12);
 
 const getFriendlyError = (err) => {
   if (!err) {
@@ -60,7 +60,29 @@ const getFriendlyError = (err) => {
 // Trust proxy for express-rate-limit (e.g. Nginx, Heroku)
 app.set('trust proxy', 1);
 
-app.use(cors());
+// CORS — allow deployed frontends + local dev
+const allowedOrigins = [
+  'http://localhost:5173',
+  'http://localhost:4321',
+  'https://clarity-connect.onrender.com',
+  'https://securesend.co.in',
+  'https://www.securesend.co.in',
+];
+
+// Also allow any *.vercel.app subdomain for preview deploys
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true); // allow non-browser (Postman, curl)
+    if (
+      allowedOrigins.includes(origin) ||
+      /\.vercel\.app$/.test(origin)
+    ) {
+      return callback(null, true);
+    }
+    return callback(new Error('Not allowed by CORS'));
+  },
+  credentials: true,
+}));
 app.use(express.json({ limit: `${requestLimitMb}mb` }));
 app.use(express.urlencoded({ limit: `${requestLimitMb}mb`, extended: true }));
 

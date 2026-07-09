@@ -16,6 +16,20 @@ export interface EncryptedPayload {
   encryptedAESKey: string;
   /** base64 12-byte IV */
   iv: string;
+  /** base64 salt used for KDF (password / key-derivation modes) */
+  salt?: string;
+  /** base64 IV used to encrypt the AES key itself (hybrid mode) */
+  keyIv?: string;
+  /** Which high-level encryption mode was used (e.g. "password", "key", "hybrid") */
+  encryptionMode?: string;
+  /** Key-derivation function identifier (e.g. "pbkdf2", "scrypt") */
+  kdf?: string;
+  /** Number of KDF iterations */
+  kdfIterations?: number;
+  /** AES algorithm variant (e.g. "AES-GCM", "AES-CBC") */
+  aesAlgorithm?: string;
+  /** RSA algorithm variant (e.g. "RSA-OAEP") */
+  rsaAlgorithm?: string;
   /** Encryption mode used for this payload */
   mode?: "hybrid" | "demo";
   /** Optional receiver identifier (email or username) — UI only */

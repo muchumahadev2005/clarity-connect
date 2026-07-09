@@ -13,6 +13,35 @@ const messageSchema = new mongoose.Schema({
     type: String,
     default: ''
   },
+  salt: {
+    type: String,
+    default: null
+  },
+  keyIv: {
+    type: String,
+    default: null
+  },
+  encryptionMode: {
+    type: String,
+    enum: ['HYBRID', 'SYMMETRIC'],
+    default: 'HYBRID'
+  },
+  kdf: {
+    type: String,
+    default: null
+  },
+  kdfIterations: {
+    type: Number,
+    default: null
+  },
+  aesAlgorithm: {
+    type: String,
+    default: null
+  },
+  rsaAlgorithm: {
+    type: String,
+    default: null
+  },
   senderId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
@@ -51,7 +80,8 @@ const messageSchema = new mongoose.Schema({
   },
   expiresAt: {
     type: Date,
-    default: null
+    default: null,
+    index: true     // TTL-friendly index for expiry queries
   },
   views: {
     type: Number,
@@ -66,8 +96,5 @@ const messageSchema = new mongoose.Schema({
 }, {
   timestamps: true
 });
-
-// Index for expiresAt to allow efficient querying
-messageSchema.index({ expiresAt: 1 });
 
 module.exports = mongoose.model('Message', messageSchema);

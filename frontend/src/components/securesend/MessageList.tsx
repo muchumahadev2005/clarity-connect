@@ -117,7 +117,7 @@ export function MessageList({ folder, messages, selectedId, onSelect, query, onQ
                       m.status === "new" && "font-medium",
                     )}
                   >
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary to-[oklch(0.65_0.18_240)] text-primary-foreground text-sm font-semibold">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-linear-to-br from-primary to-[oklch(0.65_0.18_240)] text-primary-foreground text-sm font-semibold">
                       {m.sender[0]}
                     </div>
                     <div className="min-w-0 flex-1">

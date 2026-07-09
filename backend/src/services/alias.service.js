@@ -6,15 +6,9 @@ const ALIAS_EXPIRY_MS = 24 * 60 * 60 * 1000; // 24 hours
 const MAX_GENERATION_ATTEMPTS = 5;
 
 const COMPANY_NAMES = [
-  'stripe', 'linear', 'vercel', 'figma', 'notion', 'slack', 'zoom', 'netflix', 'spotify', 'shopify',
-  'airbnb', 'github', 'adobe', 'intel', 'nvidia', 'oracle', 'tesla', 'spacex', 'disney', 'nike',
-  'amazon', 'google', 'apple', 'meta', 'microsoft', 'uber', 'lyft', 'reddit', 'discord', 'twitter'
-];
-
-const PROPER_NAMES = [
-  'alex', 'emma', 'john', 'sarah', 'david', 'sofia', 'james', 'olivia', 'lucas', 'mia',
-  'daniel', 'chloe', 'ryan', 'grace', 'william', 'zoe', 'nathan', 'lily', 'sam', 'anna',
-  'robert', 'mary', 'michael', 'patricia', 'charles', 'elizabeth', 'joseph', 'jennifer', 'thomas', 'linda'
+  'tcs', 'wipro', 'infosys', 'hcl', 'techmahindra', 'accenture', 'cognizant', 'capgemini', 'mindtree', 'persistent',
+  'ltimindtree', 'tataconsultancy', 'ibm', 'oracle', 'microsoft', 'google', 'amazon', 'adobe', 'nvidia', 'intel',
+  'salesforce', 'servicenow', 'sap', 'zoom', 'slack', 'github', 'apple', 'meta', 'netflix', 'spotify'
 ];
 
 /**
@@ -47,9 +41,7 @@ const generateAlias = async (realEmail, expiryMs = ALIAS_EXPIRY_MS) => {
 
   // Generate unique alias with retry limit
   while (!isUnique && attempts < MAX_GENERATION_ATTEMPTS) {
-    const useCompany = Math.random() > 0.5;
-    const nameList = useCompany ? COMPANY_NAMES : PROPER_NAMES;
-    const baseName = nameList[Math.floor(Math.random() * nameList.length)];
+    const baseName = COMPANY_NAMES[Math.floor(Math.random() * COMPANY_NAMES.length)];
     const num = Math.floor(100 + Math.random() * 900); // 3 digit number (100-999)
     alias = `${baseName}${num}@${ALIAS_DOMAIN}`;
 

@@ -4,6 +4,7 @@ import { timeAgo } from "./utils";
 
 export function AccessLogs({ messages, onToggleSidebar }: { messages: SecureMessage[], onToggleSidebar?: () => void }) {
   const all = messages
+    .filter((m) => m.folder === "sent")
     .flatMap((m) => m.logs.map((l) => ({ ...l, message: m })))
     .sort((a, b) => new Date(b.viewedAt).getTime() - new Date(a.viewedAt).getTime());
 
@@ -24,7 +25,7 @@ export function AccessLogs({ messages, onToggleSidebar }: { messages: SecureMess
           </div>
         </div>
         <p className="mt-0.5 text-sm text-muted-foreground">
-          Every time someone opens one of your messages.
+          Every time someone opens a message you sent.
         </p>
       </div>
       <div className="flex-1 overflow-y-auto scrollbar-thin px-6 py-6">
@@ -35,7 +36,7 @@ export function AccessLogs({ messages, onToggleSidebar }: { messages: SecureMess
         ) : (
           <ol className="relative ml-3 space-y-4 border-l-2 border-dashed border-border pl-6">
             {all.map((entry, i) => (
-              <li key={i} className="relative animate-fade-in" style={{ animationDelay: `${i * 40}ms` }}>
+              <li key={`${entry.message.id}-${entry.viewedAt}-${i}`} className="relative animate-fade-in" style={{ animationDelay: `${i * 40}ms` }}>
                 <span className="absolute -left-[33px] top-3 flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground ring-4 ring-surface shadow-elegant">
                   <Eye className="h-3 w-3" />
                 </span>
@@ -51,10 +52,10 @@ export function AccessLogs({ messages, onToggleSidebar }: { messages: SecureMess
                   </p>
                   <div className="mt-3 flex flex-wrap gap-2">
                     <span className="inline-flex items-center gap-1.5 rounded-full bg-surface px-2.5 py-1 text-[11px] text-foreground/80 ring-1 ring-border">
-                      <Globe className="h-3 w-3 text-primary" /> {entry.ip}
+                      <Globe className="h-3 w-3 text-primary" /> {entry.ip || "Unknown IP"}
                     </span>
                     <span className="inline-flex items-center gap-1.5 rounded-full bg-surface px-2.5 py-1 text-[11px] text-foreground/80 ring-1 ring-border">
-                      <Monitor className="h-3 w-3 text-primary" /> {entry.device}
+                      <Monitor className="h-3 w-3 text-primary" /> {entry.device || "Unknown device"}
                     </span>
                   </div>
                 </div>

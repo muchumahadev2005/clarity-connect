@@ -8,6 +8,13 @@ const {
 
 const maxInlinePayloadBytes = Number(process.env.MAX_INLINE_MESSAGE_BYTES || 12 * 1024 * 1024);
 
+const formatMessageLogs = (logs = []) => logs.map((l) => ({
+  viewedAt: l.viewedAt,
+  ip: l.ip,
+  device: l.device,
+  viewer: l.userId?.email || 'Someone (Guest)'
+}));
+
 const wipeMessagePayload = async (message) => {
   if (message.fileUrl) {
     await deleteEncryptedPayload(message.fileUrl);
@@ -16,6 +23,8 @@ const wipeMessagePayload = async (message) => {
   message.encryptedData = '';
   message.encryptedAESKey = '';
   message.iv = '';
+  message.salt = null;
+  message.keyIv = null;
   message.password = null;
   message.fileUrl = null;
   await message.save();
@@ -25,6 +34,8 @@ const syncWipedPayloadToResponse = (responseMessage) => {
   responseMessage.encryptedData = '';
   responseMessage.encryptedAESKey = '';
   responseMessage.iv = '';
+  responseMessage.salt = null;
+  responseMessage.keyIv = null;
   responseMessage.password = null;
   responseMessage.fileUrl = null;
 };
@@ -35,6 +46,13 @@ exports.sendMessage = async (req, res, next) => {
       encryptedData, 
       encryptedAESKey, 
       iv, 
+      salt,
+      keyIv,
+      encryptionMode,
+      kdf,
+      kdfIterations,
+      aesAlgorithm,
+      rsaAlgorithm,
       recipientEmail, 
       type, 
       protection,
@@ -93,6 +111,13 @@ exports.sendMessage = async (req, res, next) => {
       encryptedData: shouldStorePayloadExternally ? '' : encryptedData,
       encryptedAESKey,
       iv,
+      salt: salt || null,
+      keyIv: keyIv || null,
+      encryptionMode: encryptionMode || (protection === 'hybrid' ? 'HYBRID' : 'HYBRID'),
+      kdf: kdf || null,
+      kdfIterations: kdfIterations || null,
+      aesAlgorithm: aesAlgorithm || null,
+      rsaAlgorithm: rsaAlgorithm || null,
       senderId,
       receiverId,
       type: type || 'text',
@@ -122,7 +147,8 @@ exports.getInbox = async (req, res, next) => {
     
     const messages = await Message.find({ receiverId: userId })
       .sort({ createdAt: -1 })
-      .populate('senderId', 'email');
+      .populate('senderId', 'email')
+      .populate('logs.userId', 'email');
 
     // Soft-expiry logic: Wipe sensitive data if expiresAt is passed
     const now = new Date();
@@ -138,6 +164,8 @@ exports.getInbox = async (req, res, next) => {
       if (!isExpired && !responseMessage.encryptedData && responseMessage.fileUrl) {
         responseMessage.encryptedData = await loadEncryptedPayload(responseMessage.fileUrl);
       }
+
+      responseMessage.logs = formatMessageLogs(responseMessage.logs);
 
       return responseMessage;
     }));
@@ -154,7 +182,8 @@ exports.getOutbox = async (req, res, next) => {
     
     const messages = await Message.find({ senderId: userId })
       .sort({ createdAt: -1 })
-      .populate('receiverId', 'email');
+      .populate('receiverId', 'email')
+      .populate('logs.userId', 'email');
 
     // Soft-expiry logic: Wipe sensitive data if expiresAt is passed
     const now = new Date();
@@ -170,6 +199,8 @@ exports.getOutbox = async (req, res, next) => {
       if (!isExpired && !responseMessage.encryptedData && responseMessage.fileUrl) {
         responseMessage.encryptedData = await loadEncryptedPayload(responseMessage.fileUrl);
       }
+
+      responseMessage.logs = formatMessageLogs(responseMessage.logs);
 
       return responseMessage;
     }));
@@ -267,12 +298,7 @@ exports.markViewed = async (req, res, next) => {
       success: true, 
       data: { 
         views: updatedMessage.views, 
-        logs: updatedMessage.logs.map(l => ({
-          viewedAt: l.viewedAt,
-          ip: l.ip,
-          device: l.device,
-          viewer: l.userId ? l.userId.email : 'Someone (Guest)'
-        }))
+        logs: formatMessageLogs(updatedMessage.logs)
       } 
     });
   } catch (err) {
@@ -309,7 +335,7 @@ exports.getMessageById = async (req, res, next) => {
         receiverId: responseMessage.receiverId,
         type: responseMessage.type,
         protection: responseMessage.protection,
-        password: responseMessage.password,
+        password: undefined, // Do not expose secret/password in public response
         viewOnce: responseMessage.viewOnce,
         expiresAt: responseMessage.expiresAt,
         views: responseMessage.views,
@@ -317,6 +343,13 @@ exports.getMessageById = async (req, res, next) => {
         encryptedData: responseMessage.encryptedData,
         encryptedAESKey: responseMessage.encryptedAESKey,
         iv: responseMessage.iv,
+        salt: responseMessage.salt,
+        keyIv: responseMessage.keyIv,
+        encryptionMode: responseMessage.encryptionMode,
+        kdf: responseMessage.kdf,
+        kdfIterations: responseMessage.kdfIterations,
+        aesAlgorithm: responseMessage.aesAlgorithm,
+        rsaAlgorithm: responseMessage.rsaAlgorithm,
         fileUrl: responseMessage.fileUrl,
       }
     });
