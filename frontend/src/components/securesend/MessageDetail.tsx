@@ -147,10 +147,16 @@ export function MessageDetail({ message, onDelete, onMarkViewed }: Props) {
         } else {
           let privateKey: CryptoKey;
           try {
-            privateKey = (await unlockStoredRSAKeyPair(privateKeyPassphrase.trim() || undefined)).privateKey;
+            const pwdToTry = privateKeyPassphrase.trim() || "securesend_default";
+            privateKey = (await unlockStoredRSAKeyPair(pwdToTry)).privateKey;
             setDeviceKeyStatus("unlocked");
-          } catch {
-            throw new Error("Private key verification failed.");
+          } catch (unlockErr: any) {
+            console.error("Auto/Manual private key unlock failed", unlockErr);
+            throw new Error(
+              unlockErr?.message === "Incorrect passphrase."
+                ? "Incorrect device passphrase. Please check and try again."
+                : unlockErr?.message || "Private key verification failed."
+            );
           }
           plaintext = await hybridDecrypt(message.encrypted, privateKey, (aes, rsa) => {
             setAesKeyPreview(aes);

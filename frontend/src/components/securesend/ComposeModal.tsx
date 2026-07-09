@@ -530,8 +530,8 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
     } catch (err) {
       console.error("Hybrid encryption failed", err);
       toast.error(
-        err instanceof Error && err.message === "Invalid receiver public key"
-          ? "Invalid receiver public key"
+        err instanceof Error
+          ? err.message
           : "Encryption failed. Please try again.",
       );
       setEncStep(0);

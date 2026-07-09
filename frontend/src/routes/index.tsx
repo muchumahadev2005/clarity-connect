@@ -43,6 +43,27 @@ function SecureSendApp() {
 
         setUser(userRes.data.user);
 
+        // Auto-generate and sync E2EE keys to the database
+        try {
+          const { getPrivateKeyStatus, loadOrCreateRSAKeyPair, getStoredPublicKeyB64 } = await import("@/components/securesend/crypto");
+          const keyStatus = getPrivateKeyStatus();
+          if (keyStatus === "none") {
+            console.log("[KEYS] No local keypair found. Auto-generating...");
+            const generated = await loadOrCreateRSAKeyPair();
+            await api.post("/keys/register", { publicKey: generated.publicKeyB64 });
+            console.log("[KEYS] Registered auto-generated key pair.");
+          } else {
+            const currentPubKey = getStoredPublicKeyB64();
+            if (currentPubKey) {
+              await api.post("/keys/register", { publicKey: currentPubKey }).catch(err => {
+                console.warn("[KEYS] Failed to sync key to backend (might be already synced):", err);
+              });
+            }
+          }
+        } catch (keyErr) {
+          console.error("[KEYS] Key registration failed:", keyErr);
+        }
+
         const mapMsg = (m: any, folder: "inbox" | "sent") => {
           const isExpired = Boolean(m.expiresAt && new Date(m.expiresAt) < new Date());
           const isDestructed = isExpired || Boolean(m.viewOnce && (m.views || 0) > 0);

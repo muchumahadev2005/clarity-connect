@@ -502,14 +502,30 @@ export async function loadOrCreateRSAKeyPair(): Promise<{
   }
 
   migrateOldKeys();
-  const pubB64 = getStoredPublicKeyB64();
+  let pubB64 = getStoredPublicKeyB64();
   if (!pubB64) {
-    throw new Error("RSA_KEY_SETUP_REQUIRED");
+    try {
+      const generated = await createAndStoreRSAKeyPair("securesend_default");
+      pubB64 = generated.publicKeyB64;
+    } catch (err) {
+      console.error("Auto key generation failed", err);
+      throw new Error("RSA_KEY_SETUP_REQUIRED");
+    }
   }
 
   const publicKey = await importPublicKey(pubB64);
   const cacheKey = getCachedPrivateKeyCacheKey();
-  const privateKey = unlockedPrivateKeyCache.get(cacheKey);
+  let privateKey = unlockedPrivateKeyCache.get(cacheKey);
+  
+  if (!privateKey) {
+    try {
+      const unlocked = await unlockStoredRSAKeyPair("securesend_default");
+      privateKey = unlocked.privateKey;
+    } catch {
+      // ignore, key is locked and passphrase is required
+    }
+  }
+
   return {
     publicKey,
     privateKey,
