@@ -65,6 +65,7 @@ const allowedOrigins = [
   'http://localhost:5173',
   'http://localhost:4321',
   'https://clarity-connect.onrender.com',
+  'https://clarity-connect-gray.vercel.app',
   'https://securesend.co.in',
   'https://www.securesend.co.in',
 ];
