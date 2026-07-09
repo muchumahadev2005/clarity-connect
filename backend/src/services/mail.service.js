@@ -53,7 +53,7 @@ const escapeHtml = (value = '') =>
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
 
-const sanitizePlainText = (value = '') => String(value).replace(/[\u0000-\u001F\u007F]/g, '').trim();
+const sanitizePlainText = (value = '') => String(value).replace(/[\u0000-\u0009\u000B\u000C\u000E-\u001F\u007F]/g, '').trim();
 
 const throwResendError = (error, fallbackMessage) => {
   const status = error?.statusCode || error?.status || 500;
@@ -144,7 +144,7 @@ const getOtpEmailHtml = (otp) => `
   </div>
 `;
 
-const sendAnonymousEmail = async ({ to, subject, content, alias }) => {
+const sendAnonymousEmail = async ({ to, subject, content, alias, attachments }) => {
   const safeTo = sanitizePlainText(to);
   const safeSubject = sanitizePlainText(subject);
   const safeContent = sanitizePlainText(content);
@@ -169,29 +169,43 @@ const sendAnonymousEmail = async ({ to, subject, content, alias }) => {
     throw error;
   }
 
+  let customDisplayName = 'SecureSend';
+  let cleanContent = safeContent;
+
+  // Extract custom display name from [From: Name] prefix if present
+  const fromMatch = safeContent.match(/^\[From:\s*([^\]]+)\]/i);
+  if (fromMatch) {
+    customDisplayName = fromMatch[1].trim();
+    cleanContent = safeContent.replace(/^\[From:\s*[^\]]+\]\s*/i, '');
+  }
+
   console.log('[sendAnonymousEmail] Processing anonymous email', {
     alias: safeAlias,
     to: safeTo,
     subject: safeSubject,
+    displayName: customDisplayName,
+    hasAttachments: !!(attachments && attachments.length),
   });
 
   // Choose email provider
   const provider = String(process.env.ANON_EMAIL_PROVIDER || '').toLowerCase();
   if (provider === 'smtp') {
-    return sendAnonymousEmailViaSmtp({ to: safeTo, subject: safeSubject, content: safeContent, alias: safeAlias });
+    return sendAnonymousEmailViaSmtp({ to: safeTo, subject: safeSubject, content: cleanContent, alias: safeAlias, displayName: customDisplayName, attachments });
   }
 
   if (!process.env.RESEND_API_KEY) {
     // If Resend isn't configured, fall back to SMTP when available.
-    return sendAnonymousEmailViaSmtp({ to: safeTo, subject: safeSubject, content: safeContent, alias: safeAlias });
+    return sendAnonymousEmailViaSmtp({ to: safeTo, subject: safeSubject, content: cleanContent, alias: safeAlias, displayName: customDisplayName, attachments });
   }
 
   // Use Resend provider
   return sendAnonymousEmailViaResend({
     to: safeTo,
     subject: safeSubject,
-    content: safeContent,
+    content: cleanContent,
     alias: safeAlias,
+    displayName: customDisplayName,
+    attachments,
   });
 };
 
@@ -200,11 +214,19 @@ const sendAnonymousEmail = async ({ to, subject, content, alias }) => {
  * From: SecureSend (configured via RESEND_FROM in .env)
  * ReplyTo: alias@securesend.co.in (alias-based reply address)
  */
-const sendAnonymousEmailViaResend = async ({ to, subject, content, alias }) => {
+const sendAnonymousEmailViaResend = async ({ to, subject, content, alias, displayName, attachments }) => {
   const safeHtml = escapeHtml(content).replace(/\n/g, '<br />');
 
   // Use RESEND_FROM from environment (should be verified domain)
-  const from = process.env.RESEND_FROM || 'noreply@securesend.co.in';
+  const fromAddress = process.env.RESEND_FROM || 'noreply@securesend.co.in';
+  
+  let emailOnly = fromAddress;
+  if (fromAddress.includes('<')) {
+    const match = fromAddress.match(/<([^>]+)>/);
+    if (match) emailOnly = match[1];
+  }
+  
+  const from = displayName ? `"${displayName}" <${emailOnly}>` : fromAddress;
 
   if (!from) {
     const error = new Error(
@@ -224,27 +246,35 @@ const sendAnonymousEmailViaResend = async ({ to, subject, content, alias }) => {
       subject,
       replyTo,
       contentLength: content.length,
+      hasAttachments: !!(attachments && attachments.length),
       timestamp: new Date().toISOString(),
     });
+
+    const resendAttachments = (attachments && attachments.length)
+      ? attachments.map((att) => ({
+          filename: att.filename,
+          content: Buffer.from(att.content, 'base64')
+        }))
+      : undefined;
 
     const result = await getResendClient().emails.send({
       from,
       to,
-      subject: `Anonymous: ${subject || 'New Message'}`,
+      subject: subject || 'New Message',
       replyTo,
       text: content,
       html: `
-        <div style="font-family:sans-serif;padding:20px;color:#333">
-          <h2>📩 You received an anonymous message</h2>
-          <div style="background:#f5f5f5;padding:15px;border-radius:8px;margin:15px 0">
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; line-height: 1.6; color: #222; max-width: 600px;">
+          <div style="margin-bottom: 24px;">
             ${safeHtml}
           </div>
-          <hr style="border:none;border-top:1px solid #ddd;margin:20px 0"/>
-          <small style="color:#666">
-            Sent via <strong>SecureSend</strong> • Reply to: <code>${replyTo}</code>
-          </small>
+          <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0 16px 0;" />
+          <div style="font-size: 11px; color: #888;">
+            Sent securely via <strong>SecureSend</strong>. You can reply directly to: <code>${replyTo}</code>
+          </div>
         </div>
       `,
+      attachments: resendAttachments,
     });
 
     const data = normalizeResendSendResult(result);
@@ -292,7 +322,7 @@ const sendAnonymousEmailViaResend = async ({ to, subject, content, alias }) => {
  * From: Configured SMTP sender
  * ReplyTo: alias@securesend.co.in (alias-based reply address)
  */
-const sendAnonymousEmailViaSmtp = async ({ to, subject, content, alias }) => {
+const sendAnonymousEmailViaSmtp = async ({ to, subject, content, alias, displayName, attachments }) => {
   try {
     if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASS) {
       const error = new Error('SMTP configuration is missing for sending emails.');
@@ -313,25 +343,36 @@ const sendAnonymousEmailViaSmtp = async ({ to, subject, content, alias }) => {
       to: safeTo,
       subject: safeSubject,
       replyTo,
+      hasAttachments: !!(attachments && attachments.length),
       timestamp: new Date().toISOString(),
     });
 
+    const smtpAttachments = (attachments && attachments.length)
+      ? attachments.map((att) => ({
+          filename: att.filename,
+          content: att.content,
+          encoding: 'base64'
+        }))
+      : undefined;
+
     const result = await smtpTransporter.sendMail({
-      from: `"SecureSend" <${process.env.SMTP_USER}>`,
+      from: `"${displayName || 'SecureSend'}" <${process.env.SMTP_USER}>`,
       to: safeTo,
-      subject: `Anonymous: ${safeSubject || 'New Message'}`,
+      subject: safeSubject || 'New Message',
       replyTo,
       text: safeContent,
       html: `
-        <div style="font-family:sans-serif;padding:20px;background:#f9f9f9;border-radius:8px">
-          <h2 style="color:#333">📩 You received an anonymous message</h2>
-          <div style="background:white;padding:15px;border-radius:4px;margin:20px 0">
-            <p style="margin:0;white-space:pre-wrap;color:#555">${escapeHtml(safeContent).replace(/\n/g, '<br>')}</p>
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; line-height: 1.6; color: #222; max-width: 600px;">
+          <div style="margin-bottom: 24px;">
+            ${escapeHtml(safeContent).replace(/\n/g, '<br>')}
           </div>
-          <hr style="border:none;border-top:1px solid #ddd;margin:20px 0"/>
-          <small style="color:#999">Sent via <strong>SecureSend</strong> • Reply to: <code>${replyTo}</code></small>
+          <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0 16px 0;" />
+          <div style="font-size: 11px; color: #888;">
+            Sent securely via <strong>SecureSend</strong>. You can reply directly to: <code>${replyTo}</code>
+          </div>
         </div>
       `,
+      attachments: smtpAttachments,
     });
 
     console.log('[sendAnonymousEmailViaSmtp] Email sent successfully', {

@@ -64,6 +64,7 @@ app.set('trust proxy', 1);
 const allowedOrigins = [
   'http://localhost:5173',
   'http://localhost:4321',
+  'http://localhost:3000',
   'https://clarity-connect.onrender.com',
   'https://clarity-connect-gray.vercel.app',
   'https://clarity-connect.pages.dev',
@@ -78,6 +79,8 @@ app.use(cors({
     if (!origin) return callback(null, true); // allow non-browser (Postman, curl)
     if (
       allowedOrigins.includes(origin) ||
+      /^http:\/\/localhost:\d+$/.test(origin) ||
+      /^http:\/\/127\.0\.0\.1:\d+$/.test(origin) ||
       /\.vercel\.app$/.test(origin) ||
       /\.pages\.dev$/.test(origin) ||
       /\.workers\.dev$/.test(origin)

@@ -71,7 +71,7 @@ exports.generateOrGetAlias = async (req, res, next) => {
  */
 exports.sendAnonymous = async (req, res, next) => {
   try {
-    const { to, subject, message, alias } = req.body;
+    const { to, subject, message, alias, attachments } = req.body;
 
     // Validate required fields
     if (!to || !subject || !message || !alias) {
@@ -136,6 +136,7 @@ exports.sendAnonymous = async (req, res, next) => {
       subject: subject.trim(),
       content: message.trim(),
       alias: cleanAlias.split('@')[0], // pass the prefix to sendAnonymousEmail
+      attachments,
     });
 
     // Save the anonymous message in our database so it can be retrieved via inbox API
