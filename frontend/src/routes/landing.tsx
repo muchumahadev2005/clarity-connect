@@ -780,6 +780,14 @@ function Footer() {
             <SocialLink href="#" label="Twitter">
               <Twitter className="h-4 w-4" />
             </SocialLink>
+            <SocialLink
+              href="https://wa.me/?text=Check%20out%20SecureSend%20-%20End-to-End%20Encrypted%20Messaging%3A%20https%3A%2F%2Fmessage.securesend.co.in%2F"
+              label="WhatsApp"
+            >
+              <svg viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4">
+                <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.514 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.717-1.458L0 24zm6.035-4.155c1.611.956 3.197 1.458 4.887 1.458 5.432 0 9.851-4.407 9.854-9.836.002-2.63-1.023-5.101-2.887-6.968C16.082 2.631 13.615 1.604 11.99 1.604c-5.438 0-9.857 4.406-9.86 9.836-.001 1.792.476 3.54 1.38 5.099l-.993 3.626 3.73-.972v-.004zM16.57 13.91c-.247-.125-1.464-.724-1.692-.807-.227-.082-.393-.125-.558.124-.165.249-.64.807-.785.972-.145.166-.29.187-.537.063a7.127 7.127 0 0 1-1.986-1.226 7.848 7.848 0 0 1-1.373-1.708c-.145-.248-.015-.382.11-.506.112-.112.248-.29.372-.435.124-.145.165-.249.248-.415.083-.166.041-.31-.02-.435-.062-.125-.558-1.348-.765-1.847-.2-.483-.403-.418-.558-.426-.145-.007-.31-.01-.476-.01a.916.916 0 0 0-.662.31c-.227.249-.868.85-1.075 2.072-.207 1.222.682 2.404.78 2.535.099.13 1.942 2.966 4.707 4.157 2.765 1.19 2.765.793 3.26.743.495-.05 1.59-.65 1.817-1.28.227-.63.227-1.171.159-1.28-.069-.11-.26-.172-.508-.297z" />
+              </svg>
+            </SocialLink>
             <SocialLink href="#" label="GitHub">
               <Github className="h-4 w-4" />
             </SocialLink>
@@ -831,6 +839,8 @@ function SocialLink({
     <a
       href={href}
       aria-label={label}
+      target="_blank"
+      rel="noopener noreferrer"
       className="grid h-9 w-9 place-items-center rounded-full border border-border bg-card text-muted-foreground transition hover:-translate-y-0.5 hover:text-foreground hover:shadow-elegant"
     >
       {children}

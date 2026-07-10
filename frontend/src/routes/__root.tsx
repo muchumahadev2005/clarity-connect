@@ -53,16 +53,16 @@ export const Route = createRootRoute({
       },
       { property: "og:type", content: "website" },
       { property: "og:url", content: "https://message.securesend.co.in/" },
-      { property: "og:image", content: "https://message.securesend.co.in/apple-touch-icon.png" },
+      { property: "og:image", content: "https://message.securesend.co.in/og-image.png" },
       // Twitter Card
-      { name: "twitter:card", content: "summary" },
+      { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:title", content: "SecureSend - End-to-End Encrypted Messaging" },
       {
         name: "twitter:description",
         content:
           "SecureSend allows users to send encrypted messages securely using AES-256 and RSA encryption with zero-knowledge architecture.",
       },
-      { name: "twitter:image", content: "https://message.securesend.co.in/apple-touch-icon.png" },
+      { name: "twitter:image", content: "https://message.securesend.co.in/og-image.png" },
     ],
     links: [
       {
