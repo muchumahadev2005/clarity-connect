@@ -40,11 +40,7 @@ function b64ToBuf(b64: string): ArrayBuffer {
 
 /** Generate a fresh AES-GCM 256 key. Extractable so we can wrap it with RSA. */
 export async function generateAESKey(): Promise<CryptoKey> {
-  return crypto.subtle.generateKey(
-    { name: "AES-GCM", length: 256 },
-    true,
-    ["encrypt", "decrypt"],
-  );
+  return crypto.subtle.generateKey({ name: "AES-GCM", length: 256 }, true, ["encrypt", "decrypt"]);
 }
 
 /** Encrypt a string with AES-GCM. Returns ciphertext + iv (both base64). */
@@ -73,10 +69,7 @@ export async function decryptMessage(
 }
 
 /** Encrypt (wrap) a raw AES key with the recipient's RSA-OAEP public key. */
-export async function encryptAESKey(
-  aesKey: CryptoKey,
-  publicKey: CryptoKey,
-): Promise<string> {
+export async function encryptAESKey(aesKey: CryptoKey, publicKey: CryptoKey): Promise<string> {
   const raw = await crypto.subtle.exportKey("raw", aesKey);
   const wrapped = await crypto.subtle.encrypt({ name: "RSA-OAEP" }, publicKey, raw);
   return bufToB64(wrapped);
@@ -92,13 +85,10 @@ export async function decryptAESKey(
     privateKey,
     b64ToBuf(encryptedAESKey),
   );
-  return crypto.subtle.importKey(
-    "raw",
-    raw,
-    { name: "AES-GCM", length: 256 },
-    false,
-    ["encrypt", "decrypt"],
-  );
+  return crypto.subtle.importKey("raw", raw, { name: "AES-GCM", length: 256 }, false, [
+    "encrypt",
+    "decrypt",
+  ]);
 }
 
 // ---------- high level hybrid flow ----------
@@ -106,16 +96,16 @@ export async function decryptAESKey(
 export async function hybridEncrypt(
   message: string,
   publicKey: CryptoKey,
-  onProgress?: (aesKeyPreview: string, rsaWrappedKeyPreview: string) => void
+  onProgress?: (aesKeyPreview: string, rsaWrappedKeyPreview: string) => void,
 ): Promise<HybridPayload> {
   const aesKey = await generateAESKey();
-  
+
   const rawAesKeyBuffer = await crypto.subtle.exportKey("raw", aesKey);
   const rawAesBase64 = bufToB64(rawAesKeyBuffer);
   if (onProgress) onProgress(rawAesBase64, "");
 
   const { encryptedData, iv } = await encryptMessage(message, aesKey);
-  
+
   const encryptedAESKey = await encryptAESKey(aesKey, publicKey);
   if (onProgress) onProgress(rawAesBase64, encryptedAESKey);
 
@@ -125,17 +115,17 @@ export async function hybridEncrypt(
 export async function hybridDecrypt(
   payload: HybridPayload,
   privateKey: CryptoKey,
-  onProgress?: (aesKeyPreview: string, rsaWrappedKeyPreview: string) => void
+  onProgress?: (aesKeyPreview: string, rsaWrappedKeyPreview: string) => void,
 ): Promise<string> {
   if (onProgress) onProgress("Decrypting...", payload.encryptedAESKey);
-  
+
   const aesKey = await decryptAESKey(payload.encryptedAESKey, privateKey);
-  
+
   const rawAesKeyBuffer = await crypto.subtle.exportKey("raw", aesKey);
   const rawAesBase64 = bufToB64(rawAesKeyBuffer);
-  
+
   if (onProgress) onProgress(rawAesBase64, payload.encryptedAESKey);
-  
+
   return decryptMessage(payload.encryptedData, aesKey, payload.iv);
 }
 
@@ -189,14 +179,18 @@ interface StoredEncryptedPrivateKey {
 function getUserSpecificKeys(): { LS_PUBLIC: string; LS_PRIVATE: string } {
   const userEmail = typeof window !== "undefined" ? localStorage.getItem("userEmail") : null;
   const userId = userEmail || "default";
-  
+
   return {
     LS_PUBLIC: `securesend.rsa.publicKey.${userId}`,
     LS_PRIVATE: `securesend.rsa.privateKey.${userId}`,
   };
 }
 
-function getUserSpecificVaultKeys(): { LS_PUBLIC: string; LS_PRIVATE_ENCRYPTED: string; LS_PRIVATE_LEGACY: string } {
+function getUserSpecificVaultKeys(): {
+  LS_PUBLIC: string;
+  LS_PRIVATE_ENCRYPTED: string;
+  LS_PRIVATE_LEGACY: string;
+} {
   const { LS_PUBLIC, LS_PRIVATE } = getUserSpecificKeys();
   return {
     LS_PUBLIC,
@@ -206,7 +200,7 @@ function getUserSpecificVaultKeys(): { LS_PUBLIC: string; LS_PRIVATE_ENCRYPTED: 
 }
 
 function getCachedPrivateKeyCacheKey(): string {
-  return typeof window !== "undefined" ? (localStorage.getItem("userEmail") || "default") : "default";
+  return typeof window !== "undefined" ? localStorage.getItem("userEmail") || "default" : "default";
 }
 
 export function getPrivateKeyStatus(): "none" | "legacy" | "locked" | "unlocked" {
@@ -292,7 +286,10 @@ async function deriveVaultKey(passphrase: string, salt: ArrayBuffer): Promise<Cr
   );
 }
 
-async function encryptPrivateKeyForStorage(privateKeyB64: string, passphrase: string): Promise<StoredEncryptedPrivateKey> {
+async function encryptPrivateKeyForStorage(
+  privateKeyB64: string,
+  passphrase: string,
+): Promise<StoredEncryptedPrivateKey> {
   const salt = crypto.getRandomValues(new Uint8Array(16));
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const vaultKey = await deriveVaultKey(passphrase, salt.buffer);
@@ -312,7 +309,10 @@ async function encryptPrivateKeyForStorage(privateKeyB64: string, passphrase: st
   };
 }
 
-async function decryptPrivateKeyFromStorage(blob: StoredEncryptedPrivateKey, passphrase: string): Promise<string> {
+async function decryptPrivateKeyFromStorage(
+  blob: StoredEncryptedPrivateKey,
+  passphrase: string,
+): Promise<string> {
   const vaultKey = await deriveVaultKey(passphrase, b64ToBuf(blob.salt));
   const plain = await crypto.subtle.decrypt(
     { name: "AES-GCM", iv: new Uint8Array(b64ToBuf(blob.iv)) },
@@ -325,10 +325,10 @@ async function decryptPrivateKeyFromStorage(blob: StoredEncryptedPrivateKey, pas
 // Migration: Clear old non-user-specific keys from previous versions
 function migrateOldKeys() {
   if (typeof window === "undefined") return;
-  
+
   const oldPublicKey = localStorage.getItem("securesend.rsa.publicKey");
   const oldPrivateKey = localStorage.getItem("securesend.rsa.privateKey");
-  
+
   if (oldPublicKey || oldPrivateKey) {
     localStorage.removeItem("securesend.rsa.publicKey");
     localStorage.removeItem("securesend.rsa.privateKey");
@@ -516,7 +516,7 @@ export async function loadOrCreateRSAKeyPair(): Promise<{
   const publicKey = await importPublicKey(pubB64);
   const cacheKey = getCachedPrivateKeyCacheKey();
   let privateKey = unlockedPrivateKeyCache.get(cacheKey);
-  
+
   if (!privateKey) {
     try {
       const unlocked = await unlockStoredRSAKeyPair("securesend_default");
@@ -589,17 +589,11 @@ export async function deriveKeyFromPassword(
     );
   }
   // Legacy path (no salt) — SHA-256 hash for backward compatibility.
-  const hash = await crypto.subtle.digest(
-    "SHA-256",
-    new TextEncoder().encode(password.trim()),
-  );
-  return crypto.subtle.importKey(
-    "raw",
-    hash,
-    { name: "AES-GCM", length: 256 },
-    true,
-    ["encrypt", "decrypt"],
-  );
+  const hash = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(password.trim()));
+  return crypto.subtle.importKey("raw", hash, { name: "AES-GCM", length: 256 }, true, [
+    "encrypt",
+    "decrypt",
+  ]);
 }
 
 export async function symmetricEncrypt(
@@ -640,4 +634,3 @@ export async function symmetricDecrypt(
 
   return decryptMessage(payload.encryptedData, aesKey, payload.iv);
 }
-

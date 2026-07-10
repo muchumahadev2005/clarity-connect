@@ -58,7 +58,9 @@ export function MessageDetail({ message, onDelete, onMarkViewed }: Props) {
   const [aesKeyPreview, setAesKeyPreview] = useState("");
   const [rsaWrappedKeyPreview, setRsaWrappedKeyPreview] = useState("");
   const [privateKeyPassphrase, setPrivateKeyPassphrase] = useState("");
-  const [deviceKeyStatus, setDeviceKeyStatus] = useState<"none" | "legacy" | "locked" | "unlocked">("none");
+  const [deviceKeyStatus, setDeviceKeyStatus] = useState<"none" | "legacy" | "locked" | "unlocked">(
+    "none",
+  );
   const now = useStableNow(!!message);
 
   useEffect(() => {
@@ -78,17 +80,21 @@ export function MessageDetail({ message, onDelete, onMarkViewed }: Props) {
     setRsaWrappedKeyPreview("");
     setPrivateKeyPassphrase("");
     // Check RSA vault status for both hybrid AND quick-mode encrypted messages.
-    if (message?.protection === "hybrid" || (message?.protection === "quick" && !!message?.encrypted)) {
+    if (
+      message?.protection === "hybrid" ||
+      (message?.protection === "quick" && !!message?.encrypted)
+    ) {
       setDeviceKeyStatus(getPrivateKeyStatus());
     }
-  }, [message?.id]);
+  }, [message?.id, message?.content, message?.encrypted, message?.protection]);
 
   // Auto-trigger quick messages, but ONLY when the RSA vault is already unlocked
   // in memory. If locked, the passphrase prompt is shown instead (Bug 5 fix).
   useEffect(() => {
     if (
       message &&
-      message.protection === "quick" && message.encrypted &&
+      message.protection === "quick" &&
+      message.encrypted &&
       !unlocked &&
       !decrypting &&
       decryptStep === 0 &&
@@ -117,8 +123,10 @@ export function MessageDetail({ message, onDelete, onMarkViewed }: Props) {
   const expiresAtMs = message.expiresAt ? new Date(message.expiresAt).getTime() : null;
   const createdAtMs = new Date(message.timestamp).getTime();
   const totalMs = expiresAtMs ? Math.max(1, expiresAtMs - createdAtMs) : 0;
-  const remainingMs = expiresAtMs == null ? 0 : (now == null ? expiresAtMs - createdAtMs : expiresAtMs - now);
-  const isExpired = (expiresAtMs != null && now != null && remainingMs <= 0) || message.status === "expired";
+  const remainingMs =
+    expiresAtMs == null ? 0 : now == null ? expiresAtMs - createdAtMs : expiresAtMs - now;
+  const isExpired =
+    (expiresAtMs != null && now != null && remainingMs <= 0) || message.status === "expired";
 
   const handleUnlock = async () => {
     if (decrypting) return;
@@ -136,7 +144,7 @@ export function MessageDetail({ message, onDelete, onMarkViewed }: Props) {
       if (message.encrypted) {
         await new Promise((r) => setTimeout(r, 600)); // Pause to show step 1
         setDecryptStep(2);
-        
+
         let plaintext: string;
         if (message.protection === "key" || message.protection === "password") {
           const secret = message.protection === "key" ? normalizeSecretKey(pwd) : pwd;
@@ -150,12 +158,13 @@ export function MessageDetail({ message, onDelete, onMarkViewed }: Props) {
             const pwdToTry = privateKeyPassphrase.trim() || "securesend_default";
             privateKey = (await unlockStoredRSAKeyPair(pwdToTry)).privateKey;
             setDeviceKeyStatus("unlocked");
-          } catch (unlockErr: any) {
+          } catch (unlockErr: unknown) {
             console.error("Auto/Manual private key unlock failed", unlockErr);
+            const errObj = unlockErr as { message?: string };
             throw new Error(
-              unlockErr?.message === "Incorrect passphrase."
+              errObj?.message === "Incorrect passphrase."
                 ? "Incorrect device passphrase. Please check and try again."
-                : unlockErr?.message || "Private key verification failed."
+                : errObj?.message || "Private key verification failed.",
             );
           }
           plaintext = await hybridDecrypt(message.encrypted, privateKey, (aes, rsa) => {
@@ -163,9 +172,9 @@ export function MessageDetail({ message, onDelete, onMarkViewed }: Props) {
             setRsaWrappedKeyPreview(rsa);
           });
         }
-        
+
         await new Promise((r) => setTimeout(r, 2000)); // Pause to show AES preview
-        
+
         setDecryptStep(3);
         let body = plaintext;
         let requiredPwd: string | null = null;
@@ -180,7 +189,9 @@ export function MessageDetail({ message, onDelete, onMarkViewed }: Props) {
         }
         const enteredSecret = message.protection === "key" ? normalizeSecretKey(pwd) : pwd.trim();
         const requiredSecret =
-          message.protection === "key" ? normalizeSecretKey(String(requiredPwd || "")) : String(requiredPwd || "").trim();
+          message.protection === "key"
+            ? normalizeSecretKey(String(requiredPwd || ""))
+            : String(requiredPwd || "").trim();
         if (message.protection !== "hybrid" && requiredPwd && enteredSecret !== requiredSecret) {
           throw new Error("Invalid key or corrupted data");
         }
@@ -193,7 +204,9 @@ export function MessageDetail({ message, onDelete, onMarkViewed }: Props) {
         setDecryptStep(3);
         const enteredSecret = message.protection === "key" ? normalizeSecretKey(pwd) : pwd.trim();
         const requiredSecret =
-          message.protection === "key" ? normalizeSecretKey(String(message.password || "")) : String(message.password || "").trim();
+          message.protection === "key"
+            ? normalizeSecretKey(String(message.password || ""))
+            : String(message.password || "").trim();
         if (message.password && enteredSecret !== requiredSecret) {
           throw new Error("Invalid key or corrupted data");
         }
@@ -250,11 +263,7 @@ export function MessageDetail({ message, onDelete, onMarkViewed }: Props) {
       {/* Security status bar */}
       <div className="border-b border-border bg-linear-to-r from-primary-soft/60 via-surface-muted to-surface-muted px-6 py-3">
         <div className="flex flex-wrap items-center gap-2">
-          <StatusChip
-            icon={ShieldCheck}
-            label="End-to-End Encrypted"
-            tone="success"
-          />
+          <StatusChip icon={ShieldCheck} label="End-to-End Encrypted" tone="success" />
           {message.protection === "hybrid" && (
             <StatusChip icon={KeyRound} label="Hybrid: AES + RSA" tone="primary" />
           )}
@@ -267,9 +276,7 @@ export function MessageDetail({ message, onDelete, onMarkViewed }: Props) {
           {message.protection === "quick" && (
             <StatusChip icon={Sparkles} label="Quick Encryption" tone="success" />
           )}
-          {message.viewOnce && (
-            <StatusChip icon={Eye} label="View Once" tone="warning" />
-          )}
+          {message.viewOnce && <StatusChip icon={Eye} label="View Once" tone="warning" />}
           {expiresAtMs && (
             <div className="ml-auto">
               <CircularTimer remainingMs={remainingMs} totalMs={totalMs} expired={isExpired} />
@@ -284,59 +291,63 @@ export function MessageDetail({ message, onDelete, onMarkViewed }: Props) {
           <ExpiredState />
         ) : !unlocked ? (
           <>
-           {message.protection === "hybrid" ||
-          (message.protection === "quick" && message.encrypted && deviceKeyStatus !== "unlocked") ? (
-            <div className="mx-auto mt-6 max-w-md animate-fade-in bg-surface p-5 border border-primary/20 rounded-2xl shadow-floating">
-              <div className="flex items-center gap-2 mb-3 text-primary">
-                <KeyRound className="h-5 w-5" />
-                <h4 className="font-semibold">
+            {message.protection === "hybrid" ||
+            (message.protection === "quick" &&
+              message.encrypted &&
+              deviceKeyStatus !== "unlocked") ? (
+              <div className="mx-auto mt-6 max-w-md animate-fade-in bg-surface p-5 border border-primary/20 rounded-2xl shadow-floating">
+                <div className="flex items-center gap-2 mb-3 text-primary">
+                  <KeyRound className="h-5 w-5" />
+                  <h4 className="font-semibold">
+                    {message.protection === "hybrid"
+                      ? "Decrypt Hybrid Message"
+                      : "Unlock Device Key"}
+                  </h4>
+                </div>
+                <p className="text-xs text-muted-foreground mb-4">
                   {message.protection === "hybrid"
-                    ? "Decrypt Hybrid Message"
-                    : "Unlock Device Key"}
-                </h4>
+                    ? "Enter your device passphrase to unlock the encrypted private key that protects this message."
+                    : "Enter your device passphrase to decrypt this quick-encrypted message."}
+                </p>
+                <input
+                  value={privateKeyPassphrase}
+                  onChange={(e) => setPrivateKeyPassphrase(e.target.value)}
+                  placeholder="Enter your device passphrase"
+                  type="password"
+                  className="w-full rounded-xl border border-border bg-surface-muted px-4 py-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 mb-4"
+                  spellCheck={false}
+                  onKeyDown={(e) => e.key === "Enter" && handleUnlock()}
+                />
+                <button
+                  onClick={handleUnlock}
+                  disabled={
+                    (deviceKeyStatus !== "unlocked" && !privateKeyPassphrase.trim()) || decrypting
+                  }
+                  className="w-full inline-flex justify-center items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground shadow-elegant hover:opacity-90 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                >
+                  <Unlock className="h-4 w-4" />
+                  {decrypting
+                    ? "Decrypting..."
+                    : message.protection === "hybrid"
+                      ? "Decrypt AES Key & Message"
+                      : "Unlock & Decrypt"}
+                </button>
               </div>
-              <p className="text-xs text-muted-foreground mb-4">
-                {message.protection === "hybrid"
-                  ? "Enter your device passphrase to unlock the encrypted private key that protects this message."
-                  : "Enter your device passphrase to decrypt this quick-encrypted message."}
-              </p>
-              <input
-                value={privateKeyPassphrase}
-                onChange={(e) => setPrivateKeyPassphrase(e.target.value)}
-                placeholder="Enter your device passphrase"
-                type="password"
-                className="w-full rounded-xl border border-border bg-surface-muted px-4 py-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 mb-4"
-                spellCheck={false}
-                onKeyDown={(e) => e.key === "Enter" && handleUnlock()}
+            ) : (
+              <LockScreen
+                mode={message.protection as "password" | "key" | "quick"}
+                value={pwd}
+                onChange={setPwd}
+                onUnlock={handleUnlock}
+                decrypting={decrypting}
+                expired={isExpired}
               />
-              <button
-                onClick={handleUnlock}
-                disabled={(deviceKeyStatus !== "unlocked" && !privateKeyPassphrase.trim()) || decrypting}
-                className="w-full inline-flex justify-center items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground shadow-elegant hover:opacity-90 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed transition"
-              >
-                <Unlock className="h-4 w-4" />
-                {decrypting
-                  ? "Decrypting..."
-                  : message.protection === "hybrid"
-                    ? "Decrypt AES Key & Message"
-                    : "Unlock & Decrypt"}
-              </button>
-            </div>
-          ) : (
-            <LockScreen
-              mode={message.protection as "password" | "key" | "quick"}
-              value={pwd}
-              onChange={setPwd}
-              onUnlock={handleUnlock}
-              decrypting={decrypting}
-              expired={isExpired}
-            />
-          )}
+            )}
             {decrypting && (
               <div className="mx-auto mt-6 max-w-md animate-fade-in">
-                <HybridSteps 
-                  mode="decrypt" 
-                  step={decryptStep} 
+                <HybridSteps
+                  mode="decrypt"
+                  step={decryptStep}
                   aesKeyPreview={aesKeyPreview}
                   rsaWrappedKeyPreview={rsaWrappedKeyPreview}
                 />
@@ -416,7 +427,9 @@ function IconBtn({
       title={label}
       aria-label={label}
       className={`flex h-9 w-9 items-center justify-center rounded-full transition-all active:scale-90 ${
-        danger ? "hover:bg-destructive/10 text-destructive" : "hover:bg-secondary text-foreground/70"
+        danger
+          ? "hover:bg-destructive/10 text-destructive"
+          : "hover:bg-secondary text-foreground/70"
       }`}
     >
       <Icon className="h-4 w-4" />
@@ -438,7 +451,8 @@ function ExpiredState() {
       </div>
       <h3 className="text-xl font-bold text-foreground">Message Self-Destructed</h3>
       <p className="mt-2 max-w-sm text-sm text-muted-foreground leading-relaxed">
-        The security timer for this message has reached zero. All encrypted content and keys have been permanently wiped from our systems.
+        The security timer for this message has reached zero. All encrypted content and keys have
+        been permanently wiped from our systems.
       </p>
       <div className="mt-8 flex flex-col items-center gap-2">
         <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-destructive/60">
@@ -619,7 +633,7 @@ function UnlockedBody({
   return (
     <div className={`space-y-5 ${message.stealth ? "animate-blur-in" : "animate-fade-in"}`}>
       {message.type === "voice" && (
-        <VoicePlayer audioSrc={unlocked ? (decryptedBody || undefined) : undefined} />
+        <VoicePlayer audioSrc={unlocked ? decryptedBody || undefined : undefined} />
       )}
       {message.type === "file" && (
         <div className="flex items-center justify-between rounded-2xl border border-border bg-surface-muted p-4">
@@ -632,19 +646,19 @@ function UnlockedBody({
               <p className="text-xs text-muted-foreground">Encrypted attachment</p>
             </div>
           </div>
-            <button
-              onClick={handleDownloadAttachment}
-              className="inline-flex items-center gap-2 rounded-full bg-primary px-3.5 py-2 text-xs font-medium text-primary-foreground transition-all hover:opacity-95 active:scale-95"
-            >
+          <button
+            onClick={handleDownloadAttachment}
+            className="inline-flex items-center gap-2 rounded-full bg-primary px-3.5 py-2 text-xs font-medium text-primary-foreground transition-all hover:opacity-95 active:scale-95"
+          >
             <Download className="h-3.5 w-3.5" /> Decrypt & download
           </button>
         </div>
       )}
-        {message.type !== "file" && (
-          <p className="whitespace-pre-wrap text-[15px] leading-relaxed text-foreground">
-            {unlocked ? (decryptedBody || "[Message is empty]") : message.content}
-          </p>
-        )}
+      {message.type !== "file" && (
+        <p className="whitespace-pre-wrap text-[15px] leading-relaxed text-foreground">
+          {unlocked ? decryptedBody || "[Message is empty]" : message.content}
+        </p>
+      )}
       {message.viewOnce && (
         <div className="flex items-start gap-2 rounded-xl border border-warning/40 bg-warning-soft px-4 py-3 text-xs text-warning-foreground">
           <Eye className="mt-0.5 h-4 w-4 shrink-0" />

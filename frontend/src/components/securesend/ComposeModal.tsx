@@ -71,9 +71,9 @@ const expiries = [
 ];
 
 // ── Hard limits ──────────────────────────────────────────────────────────────
-const MAX_VOICE_SIZE_BYTES  = 8 * 1024 * 1024;   // 8 MB
-const MAX_FILE_SIZE_BYTES   = 8 * 1024 * 1024;   // 8 MB
-const MAX_RECORDING_SECS    = 10;                 // 10-second cap
+const MAX_VOICE_SIZE_BYTES = 8 * 1024 * 1024; // 8 MB
+const MAX_FILE_SIZE_BYTES = 8 * 1024 * 1024; // 8 MB
+const MAX_RECORDING_SECS = 10; // 10-second cap
 
 // ── Quota helpers (localStorage) ─────────────────────────────────────────────
 function getTodayKey(prefix: string) {
@@ -92,8 +92,8 @@ function bumpCount(key: string) {
   return n;
 }
 
-const DAILY_FILE_LIMIT   = 5;   // file sends per day
-const HOURLY_VOICE_LIMIT = 2;   // voice sends per hour
+const DAILY_FILE_LIMIT = 5; // file sends per day
+const HOURLY_VOICE_LIMIT = 2; // voice sends per hour
 
 export function ComposeModal({ open, onClose, onEncrypt }: Props) {
   const [tab, setTab] = useState<MessageType>("text");
@@ -132,7 +132,9 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
     if (file.size > MAX_VOICE_SIZE_BYTES) {
       setAudioBlob(null);
       setAudioFileName(null);
-      toast.error(`Audio is too large. Maximum allowed size is ${MAX_VOICE_SIZE_BYTES / 1024 / 1024} MB.`);
+      toast.error(
+        `Audio is too large. Maximum allowed size is ${MAX_VOICE_SIZE_BYTES / 1024 / 1024} MB.`,
+      );
       e.target.value = "";
       return;
     }
@@ -171,7 +173,9 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
           if (blob.size > MAX_VOICE_SIZE_BYTES) {
             setAudioBlob(null);
             setAudioFileName(null);
-            toast.error(`Audio is too large. Maximum allowed size is ${MAX_VOICE_SIZE_BYTES / 1024 / 1024} MB.`);
+            toast.error(
+              `Audio is too large. Maximum allowed size is ${MAX_VOICE_SIZE_BYTES / 1024 / 1024} MB.`,
+            );
             stream.getTracks().forEach((t) => t.stop());
             return;
           }
@@ -224,7 +228,7 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
     const timer = setTimeout(async () => {
       try {
         const trimmedEmail = hybridReceiver.trim();
-        
+
         // Simple email validation - must contain @ and .
         if (!trimmedEmail.includes("@") || !trimmedEmail.includes(".")) {
           console.log("Waiting for complete email...");
@@ -234,20 +238,21 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
         console.log(`[AUTO-FETCH] Starting fetch for: ${trimmedEmail}`);
         const apiUrl = `/users/search?q=${encodeURIComponent(trimmedEmail)}&protection=hybrid`;
         console.log(`[AUTO-FETCH] API URL: ${apiUrl}`);
-        
+
         const res = await api.get(apiUrl);
         console.log(`[AUTO-FETCH] Response status:`, res.status);
         console.log(`[AUTO-FETCH] Response data:`, res.data);
-        
+
         if (res.data && res.data.data) {
           console.log(`[AUTO-FETCH] Found ${res.data.data.length} results`);
-          
+
           if (res.data.data.length > 0) {
             // Find exact email match (case-insensitive)
-            const user = res.data.data.find((u: any) => 
-              u.email.toLowerCase() === trimmedEmail.toLowerCase()
+            const user = res.data.data.find(
+              (u: { email: string; publicKey?: string }) =>
+                u.email.toLowerCase() === trimmedEmail.toLowerCase(),
             );
-            
+
             if (user) {
               console.log(`[AUTO-FETCH] Exact match found:`, user);
               if (user.publicKey) {
@@ -375,7 +380,9 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
     } else if (tab === "voice") {
       const hourlyKey = getHourKey("voice_sends");
       if (getCount(hourlyKey) >= HOURLY_VOICE_LIMIT) {
-        toast.error(`Hourly limit reached. You can only send ${HOURLY_VOICE_LIMIT} voice messages per hour.`);
+        toast.error(
+          `Hourly limit reached. You can only send ${HOURLY_VOICE_LIMIT} voice messages per hour.`,
+        );
         return;
       }
     }
@@ -386,7 +393,9 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
         return;
       }
       if (audioBlob.size > MAX_VOICE_SIZE_BYTES) {
-        toast.error(`Audio is too large. Maximum allowed size is ${MAX_VOICE_SIZE_BYTES / 1024 / 1024} MB.`);
+        toast.error(
+          `Audio is too large. Maximum allowed size is ${MAX_VOICE_SIZE_BYTES / 1024 / 1024} MB.`,
+        );
         return;
       }
       const reader = new FileReader();
@@ -401,7 +410,9 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
         return;
       }
       if (fileToEncrypt.size > MAX_FILE_SIZE_BYTES) {
-        toast.error(`File is too large. Maximum allowed size is ${MAX_FILE_SIZE_BYTES / 1024 / 1024} MB.`);
+        toast.error(
+          `File is too large. Maximum allowed size is ${MAX_FILE_SIZE_BYTES / 1024 / 1024} MB.`,
+        );
         return;
       }
       attachmentName = fileToEncrypt.name;
@@ -440,11 +451,14 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
         return;
       }
     }
-    const origin = typeof window !== "undefined" ? window.location.origin : (import.meta.env.VITE_APP_URL || "https://securesend.co.in");
+    const origin =
+      typeof window !== "undefined"
+        ? window.location.origin
+        : import.meta.env.VITE_APP_URL || "https://securesend.co.in";
     const link = `${origin}/m/${Math.random().toString(36).slice(2, 10)}`;
     try {
       setEncStep(1);
-      
+
       let encrypted: EncryptedPayload;
       if (protection === "key" || protection === "password") {
         setEncStep(2);
@@ -509,7 +523,12 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
         type: tab,
         content: finalContent,
         protection,
-        password: protection === "hybrid" ? "" : protection === "key" ? normalizeSecretKey(password) : password,
+        password:
+          protection === "hybrid"
+            ? ""
+            : protection === "key"
+              ? normalizeSecretKey(password)
+              : password,
         expiry,
         viewOnce,
         link,
@@ -529,11 +548,7 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
       reset();
     } catch (err) {
       console.error("Hybrid encryption failed", err);
-      toast.error(
-        err instanceof Error
-          ? err.message
-          : "Encryption failed. Please try again.",
-      );
+      toast.error(err instanceof Error ? err.message : "Encryption failed. Please try again.");
       setEncStep(0);
     }
   };
@@ -584,9 +599,9 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
         <div className="flex-1 overflow-y-auto scrollbar-thin px-5 py-4 space-y-4">
           {encStep > 0 && (
             <div className="animate-fade-in">
-              <HybridSteps 
-                mode="encrypt" 
-                step={encStep} 
+              <HybridSteps
+                mode="encrypt"
+                step={encStep}
                 aesKeyPreview={aesKeyPreview}
                 rsaWrappedKeyPreview={rsaWrappedKeyPreview}
               />
@@ -676,7 +691,9 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
                     return;
                   }
                   if (selected.size > MAX_FILE_SIZE_BYTES) {
-                    toast.error(`File is too large. Maximum allowed size is ${MAX_FILE_SIZE_BYTES / 1024 / 1024} MB.`);
+                    toast.error(
+                      `File is too large. Maximum allowed size is ${MAX_FILE_SIZE_BYTES / 1024 / 1024} MB.`,
+                    );
                     setFileName(null);
                     setFileToEncrypt(null);
                     e.target.value = "";
@@ -940,7 +957,6 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
                 />
               </div>
             )}
-
           </div>
         </div>
 

@@ -93,8 +93,11 @@ function LoginPage() {
       localStorage.setItem("isLoggedIn", "true");
       setStep("success");
       setTimeout(() => navigate({ to: "/" }), 1400);
-    } catch (err: any) {
-      setError(err.response?.data?.message || "Invalid email or password");
+    } catch (err: unknown) {
+      setError(
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+          "Invalid email or password",
+      );
     } finally {
       setVerifying(false);
     }
@@ -113,8 +116,11 @@ function LoginPage() {
       setOtp(["", "", "", "", "", ""]);
       setResendIn(30);
       toast.success(`Reset code sent to ${maskEmail(email.trim())}`);
-    } catch (err: any) {
-      setError(err.response?.data?.message || "Failed to send reset code");
+    } catch (err: unknown) {
+      setError(
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+          "Failed to send reset code",
+      );
     } finally {
       setVerifying(false);
     }
@@ -160,8 +166,11 @@ function LoginPage() {
       await api.post("/auth/verify-otp", { email: email.trim(), otp: code });
       setStep("forgot-reset");
       setError(null);
-    } catch (err: any) {
-      setError(err.response?.data?.message || "Incorrect code. Try again.");
+    } catch (err: unknown) {
+      setError(
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+          "Incorrect code. Try again.",
+      );
     } finally {
       setVerifying(false);
     }
@@ -186,8 +195,11 @@ function LoginPage() {
       });
       setStep("forgot-success");
       setTimeout(() => setStep("login"), 2000);
-    } catch (err: any) {
-      setError(err.response?.data?.message || "Failed to reset password");
+    } catch (err: unknown) {
+      setError(
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+          "Failed to reset password",
+      );
     } finally {
       setVerifying(false);
     }
@@ -204,7 +216,10 @@ function LoginPage() {
 
       <div className="mx-auto flex min-h-screen w-full max-w-md flex-col items-center justify-center px-4 py-10">
         {/* Brand */}
-        <Link to="/landing" className="mb-6 flex items-center gap-2 hover:opacity-90 transition-opacity">
+        <Link
+          to="/landing"
+          className="mb-6 flex items-center gap-2 hover:opacity-90 transition-opacity"
+        >
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-elegant">
             <ShieldCheck className="h-6 w-6" />
           </div>
@@ -398,7 +413,10 @@ function LoginPage() {
                 </p>
               </div>
 
-              <div className="grid grid-cols-6 gap-2 sm:gap-3 justify-center" onPaste={handleOtpPaste}>
+              <div
+                className="grid grid-cols-6 gap-2 sm:gap-3 justify-center"
+                onPaste={handleOtpPaste}
+              >
                 {otp.map((d, i) => (
                   <input
                     key={i}

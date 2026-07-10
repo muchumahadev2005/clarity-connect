@@ -30,13 +30,39 @@ export const Route = createRootRoute({
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { name: "google-site-verification", content: "MDSddshpYh-4O4fS7D3-_411bRZBGzO95NRfhXbokf4" },
-      { title: "SecureSend — Universal Secure Communication" },
-      { name: "description", content: "Encrypt messages, voice notes, and files. Share with password, expiry, and view-once links." },
-      { property: "og:title", content: "SecureSend — Universal Secure Communication" },
-      { property: "og:description", content: "Encrypt messages, voice notes, and files. Share with password, expiry, and view-once links." },
+      { title: "SecureSend - End-to-End Encrypted Messaging" },
+      {
+        name: "description",
+        content:
+          "SecureSend allows users to send encrypted messages securely using AES-256 and RSA encryption with zero-knowledge architecture.",
+      },
+      {
+        name: "keywords",
+        content:
+          "SecureSend, Encrypted Messaging, AES, RSA, Privacy, Cyber Security, Secure Messages, Encryption",
+      },
+      { name: "robots", content: "index, follow" },
+      { name: "theme-color", content: "#0f172a" },
+      { name: "author", content: "SecureSend" },
+      // Open Graph
+      { property: "og:title", content: "SecureSend - End-to-End Encrypted Messaging" },
+      {
+        property: "og:description",
+        content:
+          "SecureSend allows users to send encrypted messages securely using AES-256 and RSA encryption with zero-knowledge architecture.",
+      },
       { property: "og:type", content: "website" },
+      { property: "og:url", content: "https://message.securesend.co.in/" },
+      { property: "og:image", content: "https://message.securesend.co.in/apple-touch-icon.png" },
+      // Twitter Card
       { name: "twitter:card", content: "summary" },
-      { name: "twitter:site", content: "@Lovable" },
+      { name: "twitter:title", content: "SecureSend - End-to-End Encrypted Messaging" },
+      {
+        name: "twitter:description",
+        content:
+          "SecureSend allows users to send encrypted messages securely using AES-256 and RSA encryption with zero-knowledge architecture.",
+      },
+      { name: "twitter:image", content: "https://message.securesend.co.in/apple-touch-icon.png" },
     ],
     links: [
       {
@@ -49,6 +75,11 @@ export const Route = createRootRoute({
         rel: "stylesheet",
         href: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap",
       },
+      { rel: "canonical", href: "https://message.securesend.co.in/" },
+      { rel: "icon", type: "image/x-icon", href: "/favicon.ico" },
+      { rel: "icon", type: "image/svg+xml", href: "/favicon.svg" },
+      { rel: "apple-touch-icon", href: "/apple-touch-icon.png" },
+      { rel: "manifest", href: "/site.webmanifest" },
     ],
   }),
   shellComponent: RootShell,

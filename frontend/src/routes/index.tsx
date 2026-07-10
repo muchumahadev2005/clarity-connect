@@ -52,7 +52,8 @@ function SecureSendApp() {
 
         // Auto-generate and sync E2EE keys to the database
         try {
-          const { getPrivateKeyStatus, loadOrCreateRSAKeyPair, getStoredPublicKeyB64 } = await import("@/components/securesend/crypto");
+          const { getPrivateKeyStatus, loadOrCreateRSAKeyPair, getStoredPublicKeyB64 } =
+            await import("@/components/securesend/crypto");
           const keyStatus = getPrivateKeyStatus();
           if (keyStatus === "none") {
             console.log("[KEYS] No local keypair found. Auto-generating...");
@@ -62,8 +63,11 @@ function SecureSendApp() {
           } else {
             const currentPubKey = getStoredPublicKeyB64();
             if (currentPubKey) {
-              await api.post("/keys/register", { publicKey: currentPubKey }).catch(err => {
-                console.warn("[KEYS] Failed to sync key to backend (might be already synced):", err);
+              await api.post("/keys/register", { publicKey: currentPubKey }).catch((err) => {
+                console.warn(
+                  "[KEYS] Failed to sync key to backend (might be already synced):",
+                  err,
+                );
               });
             }
           }
@@ -71,11 +75,45 @@ function SecureSendApp() {
           console.error("[KEYS] Key registration failed:", keyErr);
         }
 
-        const mapMsg = (m: any, folder: "inbox" | "sent") => {
+        interface DBMessageLog {
+          viewedAt?: string;
+          createdAt?: string;
+          ip?: string;
+          ipAddress?: string;
+          device?: string;
+          viewer?: string;
+          userId?: { email: string };
+        }
+
+        interface DBMessage {
+          _id: string;
+          expiresAt?: string | null;
+          viewOnce?: boolean;
+          views?: number;
+          encryptedData?: string;
+          encryptedAESKey?: string;
+          iv?: string;
+          logs?: DBMessageLog[];
+          type?: "text" | "file";
+          protection?: "quick" | "password" | "key" | "hybrid";
+          password?: string;
+          createdAt: string;
+          senderId?: { email: string };
+          receiverId?: { email: string };
+          salt?: string;
+          keyIv?: string;
+          encryptionMode?: string;
+          kdf?: string;
+          kdfIterations?: number;
+          aesAlgorithm?: string;
+          rsaAlgorithm?: string;
+        }
+
+        const mapMsg = (m: DBMessage, folder: "inbox" | "sent") => {
           const isExpired = Boolean(m.expiresAt && new Date(m.expiresAt) < new Date());
           const isDestructed = isExpired || Boolean(m.viewOnce && (m.views || 0) > 0);
           const hasEncryptedPayload = Boolean(m.encryptedData && m.encryptedAESKey && m.iv);
-          const logs = (m.logs || []).map((l: any) => ({
+          const logs = (m.logs || []).map((l: DBMessageLog) => ({
             viewedAt: l.viewedAt || l.createdAt || new Date().toISOString(),
             ip: l.ip || l.ipAddress || "Unknown IP",
             device: l.device || "Unknown device",
@@ -83,48 +121,48 @@ function SecureSendApp() {
           }));
 
           return {
-          id: m._id,
-          folder,
-          sender:
-            folder === "inbox"
-              ? m.senderId?.email || "Anonymous"
-              : `You → ${m.receiverId?.email || "Link"}`,
-          preview: isDestructed
-            ? "Message destructed or expired"
-            : m.type === "text"
-              ? "Encrypted Message"
-              : `Encrypted ${m.type}`,
-          content: isDestructed ? "" : "[Secure Message Content]",
-          type: m.type,
-          protection: m.protection || "quick",
-          password: m.password || "",
-          expiresAt: m.expiresAt,
-          viewOnce: m.viewOnce,
-          status: isDestructed ? "expired" : "new",
-          timestamp: m.createdAt,
-          views: m.views || 0,
-          logs,
-          encrypted: hasEncryptedPayload
-            ? {
-                encryptedData: m.encryptedData,
-                encryptedAESKey: m.encryptedAESKey,
-                iv: m.iv,
-                salt: m.salt,
-                keyIv: m.keyIv,
-                encryptionMode: m.encryptionMode,
-                kdf: m.kdf,
-                kdfIterations: m.kdfIterations,
-                aesAlgorithm: m.aesAlgorithm,
-                rsaAlgorithm: m.rsaAlgorithm,
-                mode: "hybrid",
-              }
-            : undefined,
+            id: m._id,
+            folder,
+            sender:
+              folder === "inbox"
+                ? m.senderId?.email || "Anonymous"
+                : `You → ${m.receiverId?.email || "Link"}`,
+            preview: isDestructed
+              ? "Message destructed or expired"
+              : m.type === "text"
+                ? "Encrypted Message"
+                : `Encrypted ${m.type}`,
+            content: isDestructed ? "" : "[Secure Message Content]",
+            type: m.type,
+            protection: m.protection || "quick",
+            password: m.password || "",
+            expiresAt: m.expiresAt,
+            viewOnce: m.viewOnce,
+            status: isDestructed ? "expired" : "new",
+            timestamp: m.createdAt,
+            views: m.views || 0,
+            logs,
+            encrypted: hasEncryptedPayload
+              ? {
+                  encryptedData: m.encryptedData,
+                  encryptedAESKey: m.encryptedAESKey,
+                  iv: m.iv,
+                  salt: m.salt,
+                  keyIv: m.keyIv,
+                  encryptionMode: m.encryptionMode,
+                  kdf: m.kdf,
+                  kdfIterations: m.kdfIterations,
+                  aesAlgorithm: m.aesAlgorithm,
+                  rsaAlgorithm: m.rsaAlgorithm,
+                  mode: "hybrid",
+                }
+              : undefined,
           } as SecureMessage;
         };
 
         const allMessages = [
-          ...inRes.data.data.map((m: any) => mapMsg(m, "inbox")),
-          ...outRes.data.data.map((m: any) => mapMsg(m, "sent")),
+          ...inRes.data.data.map((m: DBMessage) => mapMsg(m, "inbox")),
+          ...outRes.data.data.map((m: DBMessage) => mapMsg(m, "sent")),
         ];
 
         setMessages(allMessages);
@@ -242,7 +280,10 @@ function SecureSendApp() {
       console.error("Failed to mark message as viewed", err);
     }
   };
-  const isLoggedIn = typeof window !== "undefined" && localStorage.getItem("isLoggedIn") === "true" && !!localStorage.getItem("token");
+  const isLoggedIn =
+    typeof window !== "undefined" &&
+    localStorage.getItem("isLoggedIn") === "true" &&
+    !!localStorage.getItem("token");
   if (!isClient || !isLoggedIn) {
     return <LandingPage />;
   }
@@ -393,8 +434,11 @@ function SecureSendApp() {
                 },
               });
             }
-          } catch (err: any) {
-            toast.error(err.response?.data?.message || "Failed to send message. Please try again.");
+          } catch (err: unknown) {
+            const errorMsg =
+              (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+              "Failed to send message. Please try again.";
+            toast.error(errorMsg);
             throw err;
           }
         }}

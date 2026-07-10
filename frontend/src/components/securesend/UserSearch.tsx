@@ -39,7 +39,7 @@ export function UserSearch({ selected, onSelect, protection }: Props) {
         // Pass protection mode to API - only fetch publicKey for hybrid mode
         const query = new URLSearchParams({ q });
         if (protection) {
-          query.append('protection', protection);
+          query.append("protection", protection);
         }
         const res = await api.get(`/users/search?${query.toString()}`);
         setResults(res.data.data);
@@ -117,9 +117,9 @@ export function UserSearch({ selected, onSelect, protection }: Props) {
             <p className="px-3 py-4 text-center text-xs text-muted-foreground">No users found.</p>
           )}
           {!loading && !q && (
-             <p className="px-3 py-4 text-center text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
-               Type to search users...
-             </p>
+            <p className="px-3 py-4 text-center text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+              Type to search users...
+            </p>
           )}
         </div>
       )}

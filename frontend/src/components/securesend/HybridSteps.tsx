@@ -34,7 +34,10 @@ export function HybridSteps({ mode, step, className, aesKeyPreview, rsaWrappedKe
           const active = step === idx;
           const Icon = icons[i];
           return (
-            <div key={label} className="flex flex-1 flex-col sm:flex-row items-center sm:items-start gap-2 min-w-0">
+            <div
+              key={label}
+              className="flex flex-1 flex-col sm:flex-row items-center sm:items-start gap-2 min-w-0"
+            >
               <div
                 className={cn(
                   "flex h-8 w-8 shrink-0 items-center justify-center rounded-full ring-1 transition-all",
@@ -78,7 +81,9 @@ export function HybridSteps({ mode, step, className, aesKeyPreview, rsaWrappedKe
         <div className="mt-2 rounded-lg bg-surface border border-border/60 p-2.5 space-y-2">
           {aesKeyPreview && (
             <div>
-              <p className="text-[10px] font-semibold text-primary uppercase tracking-wider">Raw AES-256 Key (Transient / Exists only in memory)</p>
+              <p className="text-[10px] font-semibold text-primary uppercase tracking-wider">
+                Raw AES-256 Key (Transient / Exists only in memory)
+              </p>
               <p className="font-mono text-[9px] break-all leading-tight text-muted-foreground mt-0.5 bg-background p-1.5 rounded border border-border/40">
                 {aesKeyPreview}
               </p>
@@ -86,7 +91,9 @@ export function HybridSteps({ mode, step, className, aesKeyPreview, rsaWrappedKe
           )}
           {rsaWrappedKeyPreview && (
             <div>
-              <p className="text-[10px] font-semibold text-success uppercase tracking-wider">RSA Wrapped AES Key (Final Encrypted Form)</p>
+              <p className="text-[10px] font-semibold text-success uppercase tracking-wider">
+                RSA Wrapped AES Key (Final Encrypted Form)
+              </p>
               <p className="font-mono text-[9px] break-all leading-tight text-muted-foreground mt-0.5 bg-background p-1.5 rounded border border-border/40">
                 {rsaWrappedKeyPreview}
               </p>

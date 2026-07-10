@@ -1,15 +1,15 @@
 import React, { useState, useEffect } from "react";
-import { 
-  ArrowLeft, 
-  Search, 
-  Star, 
-  History, 
-  Sparkles, 
-  Eye, 
-  Check, 
-  X, 
+import {
+  ArrowLeft,
+  Search,
+  Star,
+  History,
+  Sparkles,
+  Eye,
+  Check,
+  X,
   ChevronRight,
-  BookOpen
+  BookOpen,
 } from "lucide-react";
 import { CATEGORIES, TEMPLATES, MailTemplate, TemplateCategory } from "./templates";
 import { cn } from "@/lib/utils";
@@ -66,13 +66,13 @@ export function TemplateLibrary({ onSelectTemplate, onBack, onSkip }: TemplateLi
   // Filter templates by selected category or search query
   const filteredTemplates = TEMPLATES.filter((tpl) => {
     const matchesCategory = selectedCategoryId ? tpl.categoryId === selectedCategoryId : true;
-    
+
     if (searchQuery.trim() === "") {
       return matchesCategory;
     }
 
     const q = searchQuery.toLowerCase();
-    const matchesSearch = 
+    const matchesSearch =
       tpl.title.toLowerCase().includes(q) ||
       tpl.description.toLowerCase().includes(q) ||
       tpl.subject.toLowerCase().includes(q) ||
@@ -81,7 +81,7 @@ export function TemplateLibrary({ onSelectTemplate, onBack, onSkip }: TemplateLi
     return matchesSearch;
   });
 
-  const selectedCategory = CATEGORIES.find(c => c.id === selectedCategoryId);
+  const selectedCategory = CATEGORIES.find((c) => c.id === selectedCategoryId);
 
   // Get favorite templates list
   const favoriteTemplates = TEMPLATES.filter((tpl) => favorites.includes(tpl.id));
@@ -104,11 +104,13 @@ export function TemplateLibrary({ onSelectTemplate, onBack, onSkip }: TemplateLi
           </button>
           <div>
             <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">
-              {selectedCategoryId ? `${selectedCategory?.icon} ${selectedCategory?.name}` : "Template Library"}
+              {selectedCategoryId
+                ? `${selectedCategory?.icon} ${selectedCategory?.name}`
+                : "Template Library"}
             </h2>
             <p className="text-sm text-muted-foreground">
-              {selectedCategoryId 
-                ? selectedCategory?.description 
+              {selectedCategoryId
+                ? selectedCategory?.description
                 : "Select a professional category or template to prefill your anonymous email."}
             </p>
           </div>
@@ -151,7 +153,9 @@ export function TemplateLibrary({ onSelectTemplate, onBack, onSkip }: TemplateLi
             <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed p-12 text-center">
               <div className="text-4xl mb-3">🔍</div>
               <p className="text-base font-semibold text-foreground">No templates found</p>
-              <p className="text-sm text-muted-foreground mt-1">Try checking your spelling or searching for another tag.</p>
+              <p className="text-sm text-muted-foreground mt-1">
+                Try checking your spelling or searching for another tag.
+              </p>
             </div>
           ) : (
             <div className="grid gap-4 sm:grid-cols-2">
@@ -255,7 +259,9 @@ export function TemplateLibrary({ onSelectTemplate, onBack, onSkip }: TemplateLi
                   onClick={() => setSelectedCategoryId(category.id)}
                   className="group flex flex-col items-start rounded-2xl border border-border bg-surface p-5 text-left shadow-sm hover:border-anon/30 hover:shadow-elegant transition-all duration-300 transform hover:-translate-y-0.5"
                 >
-                  <div className="text-3xl mb-3 duration-300 group-hover:scale-110">{category.icon}</div>
+                  <div className="text-3xl mb-3 duration-300 group-hover:scale-110">
+                    {category.icon}
+                  </div>
                   <div className="font-semibold text-foreground group-hover:text-anon transition-colors">
                     {category.name}
                   </div>
@@ -299,8 +305,14 @@ export function TemplateLibrary({ onSelectTemplate, onBack, onSkip }: TemplateLi
               <div className="rounded-xl border border-border bg-surface p-5 shadow-sm space-y-3 font-sans">
                 {/* Simulated Email Headers */}
                 <div className="text-xs text-muted-foreground space-y-1 pb-3 border-b border-border/60">
-                  <div><span className="font-medium text-foreground">From:</span> alias@securesend.co.in (Anonymous)</div>
-                  <div><span className="font-medium text-foreground">Subject:</span> {previewTemplate.subject}</div>
+                  <div>
+                    <span className="font-medium text-foreground">From:</span>{" "}
+                    alias@securesend.co.in (Anonymous)
+                  </div>
+                  <div>
+                    <span className="font-medium text-foreground">Subject:</span>{" "}
+                    {previewTemplate.subject}
+                  </div>
                 </div>
 
                 {/* Main Content Layout */}
@@ -310,11 +322,12 @@ export function TemplateLibrary({ onSelectTemplate, onBack, onSkip }: TemplateLi
                       {previewTemplate.header}
                     </div>
                   )}
-                  
+
                   <div className="font-medium">{previewTemplate.greeting}</div>
-                  
+
                   <div className="text-foreground/90 leading-relaxed whitespace-pre-wrap">
-                    {previewTemplate.body || "(Body content placeholder. Write your message in the composer.)"}
+                    {previewTemplate.body ||
+                      "(Body content placeholder. Write your message in the composer.)"}
                   </div>
 
                   <div className="pt-2 font-medium text-muted-foreground">
@@ -360,8 +373,14 @@ interface TemplateCardProps {
   onPreview: (tpl: MailTemplate) => void;
 }
 
-function TemplateCard({ template, isFavorite, onSelect, onFavorite, onPreview }: TemplateCardProps) {
-  const category = CATEGORIES.find(c => c.id === template.categoryId);
+function TemplateCard({
+  template,
+  isFavorite,
+  onSelect,
+  onFavorite,
+  onPreview,
+}: TemplateCardProps) {
+  const category = CATEGORIES.find((c) => c.id === template.categoryId);
 
   return (
     <div
@@ -377,7 +396,14 @@ function TemplateCard({ template, isFavorite, onSelect, onFavorite, onPreview }:
             onClick={(e) => onFavorite(e, template.id)}
             className="rounded-full p-1 hover:bg-muted text-muted-foreground transition-colors"
           >
-            <Star className={cn("h-4.5 w-4.5 transition-colors", isFavorite ? "fill-amber-400 text-amber-400" : "text-muted-foreground hover:text-amber-400")} />
+            <Star
+              className={cn(
+                "h-4.5 w-4.5 transition-colors",
+                isFavorite
+                  ? "fill-amber-400 text-amber-400"
+                  : "text-muted-foreground hover:text-amber-400",
+              )}
+            />
           </button>
         </div>
 
@@ -425,7 +451,7 @@ interface CompactTemplateCardProps {
 }
 
 function CompactTemplateCard({ template, onSelect }: CompactTemplateCardProps) {
-  const category = CATEGORIES.find(c => c.id === template.categoryId);
+  const category = CATEGORIES.find((c) => c.id === template.categoryId);
 
   return (
     <div

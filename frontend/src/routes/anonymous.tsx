@@ -1,5 +1,5 @@
 import { createFileRoute, Link, redirect, useNavigate } from "@tanstack/react-router";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Toaster, toast } from "sonner";
 import {
   VenetianMask,
@@ -78,13 +78,27 @@ function AnonymousMail() {
   const [subject, setSubject] = useState("");
   const [header, setHeader] = useState("");
   const [message, setMessage] = useState("");
-  const [attachment, setAttachment] = useState<{ filename: string; content: string; contentType: string } | null>(null);
+  const [attachment, setAttachment] = useState<{
+    filename: string;
+    content: string;
+    contentType: string;
+  } | null>(null);
   const [sending, setSending] = useState(false);
 
-  const fetchInbox = async () => {
+  interface AnonInboxMessage {
+    _id: string;
+    subject: string;
+    message: string;
+    isSent: boolean;
+    to: string;
+    createdAt: string;
+    unread: boolean;
+  }
+
+  const fetchInbox = useCallback(async () => {
     try {
       const res = await api.get("/anonymous/inbox");
-      const formatted = res.data.data.map((e: any) => ({
+      const formatted = res.data.data.map((e: AnonInboxMessage) => ({
         id: e._id,
         subject: e.subject,
         preview: e.message.substring(0, 60) + (e.message.length > 60 ? "..." : ""),
@@ -94,52 +108,58 @@ function AnonymousMail() {
         unread: e.isSent ? false : e.unread,
       }));
       setInbox(formatted);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Failed to fetch inbox:", err);
     }
-  };
+  }, []);
 
-  const loadOrCreateAlias = async (forceRegenerate = false) => {
-    setAliasLoading(true);
-    setAliasError(null);
+  const loadOrCreateAlias = useCallback(
+    async (forceRegenerate = false) => {
+      setAliasLoading(true);
+      setAliasError(null);
 
-    const userEmail = localStorage.getItem("userEmail");
-    if (!userEmail) {
-      setAliasError("Unable to determine your email. Please log in again.");
-      setAliasLoading(false);
-      return;
-    }
-
-    try {
-      const res = await api.post("/anonymous/generate-alias", { force: forceRegenerate });
-      const fullAlias = res.data.data.alias;
-      const prefix = fullAlias.split("@")[0];
-      setAlias(prefix);
-      localStorage.setItem("anonAlias", prefix);
-
-      if (forceRegenerate) {
-        setAliasPulse(true);
-        window.setTimeout(() => setAliasPulse(false), 900);
-        toast.success("New alias generated", {
-          description: fullAlias,
-        });
-        setInbox([]);
-      } else {
-        await fetchInbox();
+      const userEmail = localStorage.getItem("userEmail");
+      if (!userEmail) {
+        setAliasError("Unable to determine your email. Please log in again.");
+        setAliasLoading(false);
+        return;
       }
-    } catch (err: any) {
-      setAliasError(err.response?.data?.message || "Failed to load or generate alias");
-    } finally {
-      setAliasLoading(false);
-    }
-  };
+
+      try {
+        const res = await api.post("/anonymous/generate-alias", { force: forceRegenerate });
+        const fullAlias = res.data.data.alias;
+        const prefix = fullAlias.split("@")[0];
+        setAlias(prefix);
+        localStorage.setItem("anonAlias", prefix);
+
+        if (forceRegenerate) {
+          setAliasPulse(true);
+          window.setTimeout(() => setAliasPulse(false), 900);
+          toast.success("New alias generated", {
+            description: fullAlias,
+          });
+          setInbox([]);
+        } else {
+          await fetchInbox();
+        }
+      } catch (err: unknown) {
+        const errorMsg =
+          (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+          "Failed to load or generate alias";
+        setAliasError(errorMsg);
+      } finally {
+        setAliasLoading(false);
+      }
+    },
+    [fetchInbox],
+  );
 
   // Generate or retrieve alias on component mount
   useEffect(() => {
     const isLoggedIn = localStorage.getItem("isLoggedIn") === "true";
     if (!isLoggedIn) return;
     loadOrCreateAlias();
-  }, []);
+  }, [loadOrCreateAlias]);
 
   // Fetch inbox whenever view changes to inbox
   useEffect(() => {
@@ -148,7 +168,7 @@ function AnonymousMail() {
     if (view === "inbox") {
       fetchInbox();
     }
-  }, [view]);
+  }, [view, fetchInbox]);
 
   const copyAlias = async () => {
     if (!alias) return;
@@ -197,13 +217,19 @@ function AnonymousMail() {
       setMessage("");
       setAttachment(null);
       setView("dashboard");
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || "Failed to send anonymous email");
+    } catch (err: unknown) {
+      const errorMsg =
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+        "Failed to send anonymous email";
+      toast.error(errorMsg);
     } finally {
       setSending(false);
     }
   };
-  const isLoggedIn = typeof window !== "undefined" && localStorage.getItem("isLoggedIn") === "true" && !!localStorage.getItem("token");
+  const isLoggedIn =
+    typeof window !== "undefined" &&
+    localStorage.getItem("isLoggedIn") === "true" &&
+    !!localStorage.getItem("token");
   if (!isClient || !isLoggedIn) {
     return null;
   }
@@ -228,7 +254,12 @@ function AnonymousMail() {
         </div>
       </header>
 
-      <main className={cn("mx-auto px-5 py-8 animate-fade-in", view === "compose" ? "max-w-6xl" : "max-w-3xl")}>
+      <main
+        className={cn(
+          "mx-auto px-5 py-8 animate-fade-in",
+          view === "compose" ? "max-w-6xl" : "max-w-3xl",
+        )}
+      >
         {view === "dashboard" && (
           <Dashboard
             onCompose={() => setView("templates")}
@@ -306,7 +337,6 @@ function AnonymousMail() {
     </div>
   );
 }
-
 
 function Dashboard({
   onCompose,
@@ -499,7 +529,9 @@ function Compose({
   onSubject: (v: string) => void;
   onHeader: (v: string) => void;
   onMessage: (v: string) => void;
-  onAttachmentChange: (file: { filename: string; content: string; contentType: string } | null) => void;
+  onAttachmentChange: (
+    file: { filename: string; content: string; contentType: string } | null,
+  ) => void;
   onSend: () => void;
   sending: boolean;
   onBack: () => void;
@@ -547,7 +579,9 @@ function Compose({
             onClick={() => setActiveTab("write")}
             className={cn(
               "flex-1 rounded-lg py-2.5 text-xs font-semibold text-center transition-all",
-              activeTab === "write" ? "bg-surface text-foreground shadow-sm" : "text-muted-foreground"
+              activeTab === "write"
+                ? "bg-surface text-foreground shadow-sm"
+                : "text-muted-foreground",
             )}
           >
             Write Message
@@ -556,7 +590,9 @@ function Compose({
             onClick={() => setActiveTab("preview")}
             className={cn(
               "flex-1 rounded-lg py-2.5 text-xs font-semibold text-center transition-all",
-              activeTab === "preview" ? "bg-surface text-foreground shadow-sm" : "text-muted-foreground"
+              activeTab === "preview"
+                ? "bg-surface text-foreground shadow-sm"
+                : "text-muted-foreground",
             )}
           >
             Live Preview
@@ -567,10 +603,10 @@ function Compose({
       {/* Main Grid Layout */}
       <div className="grid gap-6 lg:grid-cols-12">
         {/* Editor Form Panel */}
-        <div 
+        <div
           className={cn(
             "lg:col-span-7 space-y-4",
-            activeTab === "write" ? "block" : "hidden sm:block"
+            activeTab === "write" ? "block" : "hidden sm:block",
           )}
         >
           <div className="rounded-2xl border border-border bg-surface p-6 shadow-elegant">
@@ -674,12 +710,7 @@ function Compose({
         </div>
 
         {/* Live Preview Panel */}
-        <div 
-          className={cn(
-            "lg:col-span-5",
-            activeTab === "preview" ? "block" : "hidden sm:block"
-          )}
-        >
+        <div className={cn("lg:col-span-5", activeTab === "preview" ? "block" : "hidden sm:block")}>
           <EmailPreview
             alias={alias}
             to={to}
@@ -754,15 +785,24 @@ function InboxView({
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-2">
-                  <span className={cn("truncate text-sm sm:text-base", e.unread ? "font-semibold" : "font-medium")}>
+                  <span
+                    className={cn(
+                      "truncate text-sm sm:text-base",
+                      e.unread ? "font-semibold" : "font-medium",
+                    )}
+                  >
                     {e.unread && (
                       <span className="mr-2 inline-block h-2 w-2 rounded-full bg-anon align-middle" />
                     )}
                     {e.subject}
                   </span>
-                  <span className="shrink-0 text-[10px] sm:text-[11px] text-muted-foreground">{e.time}</span>
+                  <span className="shrink-0 text-[10px] sm:text-[11px] text-muted-foreground">
+                    {e.time}
+                  </span>
                 </div>
-                <p className="mt-0.5 truncate text-xs sm:text-sm text-muted-foreground">{e.preview}</p>
+                <p className="mt-0.5 truncate text-xs sm:text-sm text-muted-foreground">
+                  {e.preview}
+                </p>
                 <div className="mt-2 flex">
                   <div className="inline-flex items-center gap-1 rounded-full bg-anon-soft px-2 py-0.5 text-[10px] sm:text-[11px] font-medium text-anon ring-1 ring-anon/20 max-w-full">
                     <span className="truncate">{e.sender}</span> 🎭
@@ -819,10 +859,9 @@ function ReadEmail({
 
         <div className="mt-6 flex items-center gap-2 rounded-lg bg-anon-soft px-3 py-2 text-xs text-anon ring-1 ring-anon/20">
           <ShieldCheck className="h-3.5 w-3.5" />
-          {isSent 
-            ? "Your identity was hidden from the recipient using your alias." 
-            : "The sender's real identity is hidden by their alias."
-          }
+          {isSent
+            ? "Your identity was hidden from the recipient using your alias."
+            : "The sender's real identity is hidden by their alias."}
         </div>
       </article>
     </div>

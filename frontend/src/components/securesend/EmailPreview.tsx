@@ -11,11 +11,18 @@ interface EmailPreviewProps {
   attachment?: { filename: string } | null;
 }
 
-export function EmailPreview({ alias, to, subject, header, message, attachment }: EmailPreviewProps) {
+export function EmailPreview({
+  alias,
+  to,
+  subject,
+  header,
+  message,
+  attachment,
+}: EmailPreviewProps) {
   const [deviceMode, setDeviceMode] = useState<"desktop" | "mobile">("desktop");
 
   const fullSenderEmail = alias ? `${alias}@securesend.co.in` : "loading-alias@securesend.co.in";
-  
+
   return (
     <div className="flex flex-col h-full rounded-2xl border border-border bg-surface shadow-elegant overflow-hidden">
       {/* Panel Header */}
@@ -24,14 +31,14 @@ export function EmailPreview({ alias, to, subject, header, message, attachment }
           <Mail className="h-4 w-4 text-anon" />
           <span className="text-sm font-semibold text-foreground">Live Email Preview</span>
         </div>
-        
+
         {/* Device Switcher */}
         <div className="flex items-center gap-1 rounded-lg bg-muted p-1">
           <button
             onClick={() => setDeviceMode("desktop")}
             className={cn(
               "rounded-md p-1.5 text-muted-foreground transition-all",
-              deviceMode === "desktop" && "bg-surface text-foreground shadow-xs"
+              deviceMode === "desktop" && "bg-surface text-foreground shadow-xs",
             )}
             title="Desktop view"
           >
@@ -41,7 +48,7 @@ export function EmailPreview({ alias, to, subject, header, message, attachment }
             onClick={() => setDeviceMode("mobile")}
             className={cn(
               "rounded-md p-1.5 text-muted-foreground transition-all",
-              deviceMode === "mobile" && "bg-surface text-foreground shadow-xs"
+              deviceMode === "mobile" && "bg-surface text-foreground shadow-xs",
             )}
             title="Mobile view"
           >
@@ -55,7 +62,7 @@ export function EmailPreview({ alias, to, subject, header, message, attachment }
         <div
           className={cn(
             "w-full bg-surface border border-border/80 rounded-xl shadow-xs transition-all duration-300 font-sans",
-            deviceMode === "mobile" ? "max-w-[360px]" : "max-w-full"
+            deviceMode === "mobile" ? "max-w-[360px]" : "max-w-full",
           )}
         >
           {/* Email Client Header Bar */}
@@ -67,7 +74,9 @@ export function EmailPreview({ alias, to, subject, header, message, attachment }
                   {fullSenderEmail}
                 </span>
               </div>
-              <span className="text-[10px] text-muted-foreground/80 font-medium">Anonymous Secure</span>
+              <span className="text-[10px] text-muted-foreground/80 font-medium">
+                Anonymous Secure
+              </span>
             </div>
             <div>
               <span className="font-semibold text-foreground">To:</span>{" "}
@@ -115,7 +124,8 @@ export function EmailPreview({ alias, to, subject, header, message, attachment }
                 message.trim()
               ) : (
                 <span className="italic text-muted-foreground/60 select-none">
-                  Write your message contents in the editor on the left. The preview updates automatically in real-time.
+                  Write your message contents in the editor on the left. The preview updates
+                  automatically in real-time.
                 </span>
               )}
             </div>

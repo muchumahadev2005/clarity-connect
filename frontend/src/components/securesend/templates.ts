@@ -23,50 +23,50 @@ export const CATEGORIES: TemplateCategory[] = [
     id: "anonymous",
     name: "Anonymous Message",
     icon: "📩",
-    description: "General, secret, or feedback messages with complete privacy."
+    description: "General, secret, or feedback messages with complete privacy.",
   },
   {
     id: "recruitment",
     name: "Recruitment",
     icon: "💼",
-    description: "Professional recruitment and interview templates."
+    description: "Professional recruitment and interview templates.",
   },
   {
     id: "hr",
     name: "HR & Employment",
     icon: "👔",
-    description: "Official documents and employment notifications."
+    description: "Official documents and employment notifications.",
   },
   {
     id: "business",
     name: "Business",
     icon: "🏢",
-    description: "Corporate proposals, invoices, and payment reminders."
+    description: "Corporate proposals, invoices, and payment reminders.",
   },
   {
     id: "education",
     name: "Education",
     icon: "🎓",
-    description: "Admission updates, schedules, and exam notifications."
+    description: "Admission updates, schedules, and exam notifications.",
   },
   {
     id: "legal",
     name: "Legal",
     icon: "⚖️",
-    description: "Notices, privacy compliance, and policy updates."
+    description: "Notices, privacy compliance, and policy updates.",
   },
   {
     id: "personal",
     name: "Personal",
     icon: "🎉",
-    description: "Greeting cards, event invitations, and personal notes."
+    description: "Greeting cards, event invitations, and personal notes.",
   },
   {
     id: "custom",
     name: "Custom",
     icon: "✨",
-    description: "Start from a blank slate with custom styling."
-  }
+    description: "Start from a blank slate with custom styling.",
+  },
 ];
 
 export const TEMPLATES: MailTemplate[] = [
@@ -81,7 +81,7 @@ export const TEMPLATES: MailTemplate[] = [
     greeting: "Hello,",
     body: "I am sending you this message anonymously. Please review the details below.",
     footer: "Sent securely via SecureSend Platform.",
-    tags: ["Anonymous", "General"]
+    tags: ["Anonymous", "General"],
   },
   {
     id: "anon-secret",
@@ -93,7 +93,7 @@ export const TEMPLATES: MailTemplate[] = [
     greeting: "Dear Recipient,",
     body: "This message contains confidential information that is intended for your eyes only. Please handle this information with discretion.",
     footer: "Decryption keys stay local. No logs stored.",
-    tags: ["Confidential", "Secret", "Anonymous"]
+    tags: ["Confidential", "Secret", "Anonymous"],
   },
   {
     id: "anon-confession",
@@ -105,7 +105,7 @@ export const TEMPLATES: MailTemplate[] = [
     greeting: "To whom it may concern,",
     body: "I wanted to confess something that I have kept to myself for a while. I hope writing this anonymously helps bring clarity to the situation.",
     footer: "Delivered privately via SecureSend Confessions.",
-    tags: ["Confession", "Personal", "Confidential"]
+    tags: ["Confession", "Personal", "Confidential"],
   },
   {
     id: "anon-feedback",
@@ -117,7 +117,7 @@ export const TEMPLATES: MailTemplate[] = [
     greeting: "Hi Team,",
     body: "Here is some constructive feedback regarding recent work. I believe focusing on communication and workflow improvements will help the team scale faster.",
     footer: "Feedback submitted anonymously.",
-    tags: ["Feedback", "Suggestion", "Anonymous"]
+    tags: ["Feedback", "Suggestion", "Anonymous"],
   },
   {
     id: "anon-complaint",
@@ -129,7 +129,7 @@ export const TEMPLATES: MailTemplate[] = [
     greeting: "Attention Management,",
     body: "I am writing to report an issue that requires immediate investigation. Please check the current compliance logs and operational activities.",
     footer: "Reported anonymously for quality assurance.",
-    tags: ["Complaint", "Compliance", "Legal"]
+    tags: ["Complaint", "Compliance", "Legal"],
   },
   {
     id: "anon-appreciation",
@@ -141,7 +141,7 @@ export const TEMPLATES: MailTemplate[] = [
     greeting: "Dear Colleague,",
     body: "I wanted to take a moment to appreciate your hard work and help recently. Your support was invaluable to the team's success.",
     footer: "Sent anonymously by an appreciative colleague.",
-    tags: ["Appreciation", "Kudos", "Personal"]
+    tags: ["Appreciation", "Kudos", "Personal"],
   },
   {
     id: "anon-suggestion",
@@ -153,7 +153,7 @@ export const TEMPLATES: MailTemplate[] = [
     greeting: "Hi Management,",
     body: "I have a suggestion for improving our product workflow. Introducing automated checks during code submission will reduce errors.",
     footer: "Submitted anonymously via Suggestion Channel.",
-    tags: ["Suggestion", "Innovation"]
+    tags: ["Suggestion", "Innovation"],
   },
   {
     id: "anon-warning",
@@ -165,7 +165,7 @@ export const TEMPLATES: MailTemplate[] = [
     greeting: "Attention,",
     body: "Please check your network access points. There is a potential misconfiguration that needs to be secured immediately.",
     footer: "Alert sent anonymously for defensive purposes.",
-    tags: ["Warning", "Security", "Alert"]
+    tags: ["Warning", "Security", "Alert"],
   },
   {
     id: "anon-custom",
@@ -177,7 +177,7 @@ export const TEMPLATES: MailTemplate[] = [
     greeting: "Dear Recipient,",
     body: "",
     footer: "Sent via SecureSend.",
-    tags: ["Custom", "Blank"]
+    tags: ["Custom", "Blank"],
   },
 
   // --- RECRUITMENT ---
@@ -191,7 +191,7 @@ export const TEMPLATES: MailTemplate[] = [
     greeting: "Dear Candidate,",
     body: "We are pleased to inform you that your application has been shortlisted for the next phase of our hiring process.",
     footer: "Sincerely, Talent Acquisition Department.",
-    tags: ["Recruitment", "Shortlisted", "Interview"]
+    tags: ["Recruitment", "Shortlisted", "Interview"],
   },
   {
     id: "rec-invite",
@@ -203,7 +203,7 @@ export const TEMPLATES: MailTemplate[] = [
     greeting: "Dear Candidate,",
     body: "We would like to invite you for an interview to discuss your experience and fit for this role. Please let us know your availability.",
     footer: "Kind regards, Human Resources Team.",
-    tags: ["Recruitment", "Interview", "Invite"]
+    tags: ["Recruitment", "Interview", "Invite"],
   },
   {
     id: "rec-assessment",
@@ -215,7 +215,7 @@ export const TEMPLATES: MailTemplate[] = [
     greeting: "Dear Candidate,",
     body: "Please find the online technical assessment link attached. The test must be completed within the next 48 hours.",
     footer: "Best of luck, Technical Recruitment Team.",
-    tags: ["Recruitment", "Assessment", "Test"]
+    tags: ["Recruitment", "Assessment", "Test"],
   },
   {
     id: "rec-technical",
@@ -227,7 +227,7 @@ export const TEMPLATES: MailTemplate[] = [
     greeting: "Dear Candidate,",
     body: "We invite you to the Technical Interview Round. This session will focus on coding, design patterns, and system architecture.",
     footer: "Best regards, Engineering Team.",
-    tags: ["Recruitment", "Technical", "Interview"]
+    tags: ["Recruitment", "Technical", "Interview"],
   },
   {
     id: "rec-hr",
@@ -239,7 +239,7 @@ export const TEMPLATES: MailTemplate[] = [
     greeting: "Dear Candidate,",
     body: "We would like to invite you to the final HR discussion round to align on benefits, culture, and joining policies.",
     footer: "Warm regards, People Operations Team.",
-    tags: ["Recruitment", "HR", "Interview"]
+    tags: ["Recruitment", "HR", "Interview"],
   },
   {
     id: "rec-final",
@@ -251,7 +251,7 @@ export const TEMPLATES: MailTemplate[] = [
     greeting: "Dear Candidate,",
     body: "You have successfully cleared our technical hurdles. We invite you to the final managerial round with our executive partners.",
     footer: "Sincerely, Leadership Hiring Team.",
-    tags: ["Recruitment", "Final", "Interview"]
+    tags: ["Recruitment", "Final", "Interview"],
   },
   {
     id: "rec-congrats",
@@ -263,7 +263,7 @@ export const TEMPLATES: MailTemplate[] = [
     greeting: "Dear Candidate,",
     body: "We have received positive feedback from all interview panels. We congratulations you on clearing all rounds successfully.",
     footer: "Best regards, Talent Acquisition Team.",
-    tags: ["Recruitment", "Congrats", "Selected"]
+    tags: ["Recruitment", "Congrats", "Selected"],
   },
   {
     id: "rec-selected",
@@ -275,7 +275,7 @@ export const TEMPLATES: MailTemplate[] = [
     greeting: "Dear Candidate,",
     body: "We are thrilled to inform you that you have been selected for the position. We are excited about having you join our team.",
     footer: "Sincerely, HR Director.",
-    tags: ["Recruitment", "Selected", "Offer"]
+    tags: ["Recruitment", "Selected", "Offer"],
   },
   {
     id: "rec-rejected",
@@ -287,7 +287,7 @@ export const TEMPLATES: MailTemplate[] = [
     greeting: "Dear Candidate,",
     body: "Thank you for taking the time to interview with us. Unfortunately, we have decided to move forward with other candidates at this stage.",
     footer: "We wish you the very best in your search.",
-    tags: ["Recruitment", "Rejected", "Status"]
+    tags: ["Recruitment", "Rejected", "Status"],
   },
   {
     id: "rec-waiting",
@@ -299,7 +299,7 @@ export const TEMPLATES: MailTemplate[] = [
     greeting: "Dear Candidate,",
     body: "Your profile has been placed on our waiting list. We will reach out to you if a new position opens up.",
     footer: "Sincerely, Recruitment Team.",
-    tags: ["Recruitment", "Waiting", "Status"]
+    tags: ["Recruitment", "Waiting", "Status"],
   },
   {
     id: "rec-update",
@@ -311,7 +311,7 @@ export const TEMPLATES: MailTemplate[] = [
     greeting: "Dear Candidate,",
     body: "Our recruitment panels are reviewing your profiles. We will send you another update by early next week.",
     footer: "Thanks for your patience, Recruitment Operations.",
-    tags: ["Recruitment", "Update"]
+    tags: ["Recruitment", "Update"],
   },
 
   // --- HR & EMPLOYMENT ---
@@ -325,7 +325,7 @@ export const TEMPLATES: MailTemplate[] = [
     greeting: "Dear Future Employee,",
     body: "We are pleased to offer you employment with our organization. Please find the detailed salary breakdown and offer details enclosed.",
     footer: "Warm regards, Human Resources Director.",
-    tags: ["HR", "Offer", "Employment"]
+    tags: ["HR", "Offer", "Employment"],
   },
   {
     id: "hr-appointment",
@@ -337,7 +337,7 @@ export const TEMPLATES: MailTemplate[] = [
     greeting: "Dear Employee,",
     body: "This is to confirm your official appointment starting this month. Please submit the joining checklist documents.",
     footer: "Sincerely, People Operations Department.",
-    tags: ["HR", "Appointment", "Onboarding"]
+    tags: ["HR", "Appointment", "Onboarding"],
   },
   {
     id: "hr-joining",
@@ -349,7 +349,7 @@ export const TEMPLATES: MailTemplate[] = [
     greeting: "Dear Colleague,",
     body: "Welcome to the organization! Please find the joining instructions, first day schedule, and office guidelines attached.",
     footer: "Warmly, Employee Relations Team.",
-    tags: ["HR", "Joining", "Instructions"]
+    tags: ["HR", "Joining", "Instructions"],
   },
   {
     id: "hr-promotion",
@@ -361,7 +361,7 @@ export const TEMPLATES: MailTemplate[] = [
     greeting: "Dear Colleague,",
     body: "We are delighted to promote you to your new role. Thank you for your continued dedication and leadership.",
     footer: "Congratulations! Sincerely, HR Department.",
-    tags: ["HR", "Promotion", "Congratulations"]
+    tags: ["HR", "Promotion", "Congratulations"],
   },
   {
     id: "hr-salary",
@@ -373,7 +373,7 @@ export const TEMPLATES: MailTemplate[] = [
     greeting: "Dear Colleague,",
     body: "This letter is to inform you that your compensation has been revised to reflect your contributions over the past year.",
     footer: "Best regards, Compensation Operations.",
-    tags: ["HR", "Salary", "Revision"]
+    tags: ["HR", "Salary", "Revision"],
   },
   {
     id: "hr-confirmation",
@@ -385,7 +385,7 @@ export const TEMPLATES: MailTemplate[] = [
     greeting: "Dear Colleague,",
     body: "We are pleased to confirm that you have successfully completed your probation period, and your employment is now confirmed.",
     footer: "Warmly, People Operations Team.",
-    tags: ["HR", "Confirmation", "Employment"]
+    tags: ["HR", "Confirmation", "Employment"],
   },
   {
     id: "hr-experience",
@@ -397,7 +397,7 @@ export const TEMPLATES: MailTemplate[] = [
     greeting: "To Whom It May Concern,",
     body: "This is to certify that the employee was working as a valuable member of our team during their tenure.",
     footer: "Sincerely, HR Operations Manager.",
-    tags: ["HR", "Experience", "Certificate"]
+    tags: ["HR", "Experience", "Certificate"],
   },
   {
     id: "hr-relieving",
@@ -409,7 +409,7 @@ export const TEMPLATES: MailTemplate[] = [
     greeting: "Dear Colleague,",
     body: "We confirm that you have been relieved from your duties. We thank you for your service and wish you the best in your career.",
     footer: "Sincerely, Employee Relations Team.",
-    tags: ["HR", "Relieving", "Exit"]
+    tags: ["HR", "Relieving", "Exit"],
   },
   {
     id: "hr-warning",
@@ -421,7 +421,7 @@ export const TEMPLATES: MailTemplate[] = [
     greeting: "Dear Employee,",
     body: "This is a formal warning letter regarding your recent workplace behavior. Please review the company code of conduct policy immediately.",
     footer: "Sincerely, Human Resources Compliance.",
-    tags: ["HR", "Warning", "Compliance"]
+    tags: ["HR", "Warning", "Compliance"],
   },
   {
     id: "hr-appreciation",
@@ -433,7 +433,7 @@ export const TEMPLATES: MailTemplate[] = [
     greeting: "Dear Colleague,",
     body: "Thank you for your excellent performance during our recent project. Your dedication has set a benchmark for the team.",
     footer: "Warm regards, Leadership Team.",
-    tags: ["HR", "Appreciation", "Kudos"]
+    tags: ["HR", "Appreciation", "Kudos"],
   },
   {
     id: "hr-performance",
@@ -445,7 +445,7 @@ export const TEMPLATES: MailTemplate[] = [
     greeting: "Dear Colleague,",
     body: "Please find the summary of your performance review. Let's schedule a 1-on-1 discussion to map out your career goals.",
     footer: "Sincerely, People Ops Manager.",
-    tags: ["HR", "Performance", "Review"]
+    tags: ["HR", "Performance", "Review"],
   },
   {
     id: "hr-transfer",
@@ -457,7 +457,7 @@ export const TEMPLATES: MailTemplate[] = [
     greeting: "Dear Colleague,",
     body: "This is to confirm your transfer to our other branch office starting next month. Please coordinate with relocation support.",
     footer: "Warm regards, HR Mobility Desk.",
-    tags: ["HR", "Transfer", "Mobility"]
+    tags: ["HR", "Transfer", "Mobility"],
   },
 
   // --- BUSINESS ---
@@ -471,7 +471,7 @@ export const TEMPLATES: MailTemplate[] = [
     greeting: "Dear Partner,",
     body: "We are pleased to submit our formal business proposal. We look forward to collaborating and driving value together.",
     footer: "Best regards, Business Development Team.",
-    tags: ["Business", "Proposal", "Partnership"]
+    tags: ["Business", "Proposal", "Partnership"],
   },
   {
     id: "bus-invoice",
@@ -483,7 +483,7 @@ export const TEMPLATES: MailTemplate[] = [
     greeting: "Dear Client,",
     body: "Please find the invoice for services rendered. The payment is due within 15 days according to our contract agreement.",
     footer: "Thank you for your business. Finance Department.",
-    tags: ["Business", "Invoice", "Finance"]
+    tags: ["Business", "Invoice", "Finance"],
   },
   {
     id: "bus-reminder",
@@ -495,7 +495,7 @@ export const TEMPLATES: MailTemplate[] = [
     greeting: "Dear Customer,",
     body: "This is a friendly reminder that invoice payment is currently outstanding. Please process the payment at your earliest convenience.",
     footer: "Thanks, Accounts Team.",
-    tags: ["Business", "Reminder", "Finance"]
+    tags: ["Business", "Reminder", "Finance"],
   },
   {
     id: "bus-quotation",
@@ -507,7 +507,7 @@ export const TEMPLATES: MailTemplate[] = [
     greeting: "Dear Client,",
     body: "Please find the formal quotation for the products you requested. The prices listed are valid for the next 30 days.",
     footer: "Best regards, Sales Operations Team.",
-    tags: ["Business", "Quotation", "Sales"]
+    tags: ["Business", "Quotation", "Sales"],
   },
   {
     id: "bus-po",
@@ -519,7 +519,7 @@ export const TEMPLATES: MailTemplate[] = [
     greeting: "Dear Supplier,",
     body: "Please find the purchase order attached. Kindly acknowledge receipt and confirm the estimated delivery dates.",
     footer: "Sincerely, Purchasing Operations Manager.",
-    tags: ["Business", "Purchase Order", "Procurement"]
+    tags: ["Business", "Purchase Order", "Procurement"],
   },
   {
     id: "bus-contract",
@@ -531,7 +531,7 @@ export const TEMPLATES: MailTemplate[] = [
     greeting: "Dear Client,",
     body: "Please find the initial contract agreement draft attached. Kindly review and send back with redlines.",
     footer: "Best regards, Legal Team.",
-    tags: ["Business", "Contract", "Draft"]
+    tags: ["Business", "Contract", "Draft"],
   },
   {
     id: "bus-nda",
@@ -543,7 +543,7 @@ export const TEMPLATES: MailTemplate[] = [
     greeting: "Dear Partner,",
     body: "Before we share confidential business files, please sign the mutual NDA attached via DocuSign link.",
     footer: "Best regards, Operations Desk.",
-    tags: ["Business", "NDA", "Partnership"]
+    tags: ["Business", "NDA", "Partnership"],
   },
   {
     id: "bus-update",
@@ -555,7 +555,7 @@ export const TEMPLATES: MailTemplate[] = [
     greeting: "Dear Client,",
     body: "Here is the weekly update. The development phase is on schedule, and we are preparing for the testing round.",
     footer: "Warmly, Project Management Office.",
-    tags: ["Business", "Update", "Project"]
+    tags: ["Business", "Update", "Project"],
   },
   {
     id: "bus-followup",
@@ -567,7 +567,7 @@ export const TEMPLATES: MailTemplate[] = [
     greeting: "Dear Client,",
     body: "I wanted to follow up on our discussion last week. Let me know if you have any questions about our pricing.",
     footer: "Kind regards, Sales Representative.",
-    tags: ["Business", "Follow-up", "Sales"]
+    tags: ["Business", "Follow-up", "Sales"],
   },
   {
     id: "bus-invite",
@@ -579,7 +579,7 @@ export const TEMPLATES: MailTemplate[] = [
     greeting: "Hi Team,",
     body: "We invite you to the weekly operational meeting to review key performance metrics and align on goals.",
     footer: "Sincerely, Operations Lead.",
-    tags: ["Business", "Meeting", "Invite"]
+    tags: ["Business", "Meeting", "Invite"],
   },
   {
     id: "bus-partnership",
@@ -591,7 +591,7 @@ export const TEMPLATES: MailTemplate[] = [
     greeting: "Dear Partner,",
     body: "We propose a strategic partnership to combine our software solutions. Let's schedule an intro call.",
     footer: "Best regards, Strategic Alliances Director.",
-    tags: ["Business", "Partnership", "Proposal"]
+    tags: ["Business", "Partnership", "Proposal"],
   },
 
   // --- EDUCATION ---
@@ -605,7 +605,7 @@ export const TEMPLATES: MailTemplate[] = [
     greeting: "Dear Applicant,",
     body: "We are pleased to inform you that you have been admitted to our university course for the upcoming academic term.",
     footer: "Sincerely, Admissions Director.",
-    tags: ["Education", "Admission", "Selection"]
+    tags: ["Education", "Admission", "Selection"],
   },
   {
     id: "edu-scholarship",
@@ -617,7 +617,7 @@ export const TEMPLATES: MailTemplate[] = [
     greeting: "Dear Student,",
     body: "We are thrilled to inform you that you have been selected for the academic scholarship based on your scores.",
     footer: "Congratulations! Sincerely, Scholarship Committee.",
-    tags: ["Education", "Scholarship", "Congrats"]
+    tags: ["Education", "Scholarship", "Congrats"],
   },
   {
     id: "edu-internship",
@@ -629,7 +629,7 @@ export const TEMPLATES: MailTemplate[] = [
     greeting: "Dear Student,",
     body: "We are pleased to confirm your selection for the upcoming summer internship program with our partners.",
     footer: "Best regards, Placement Officer.",
-    tags: ["Education", "Internship", "Selection"]
+    tags: ["Education", "Internship", "Selection"],
   },
   {
     id: "edu-hallticket",
@@ -641,7 +641,7 @@ export const TEMPLATES: MailTemplate[] = [
     greeting: "Dear Student,",
     body: "Please download your examination hall ticket from the portal link. Please check your roll number and details.",
     footer: "Regards, Controller of Examinations.",
-    tags: ["Education", "Hall Ticket", "Exam"]
+    tags: ["Education", "Hall Ticket", "Exam"],
   },
   {
     id: "edu-schedule",
@@ -653,7 +653,7 @@ export const TEMPLATES: MailTemplate[] = [
     greeting: "Dear Students,",
     body: "Please find the detailed schedule for the upcoming semester examinations. The exams start on Monday at 9:00 AM.",
     footer: "Sincerely, Academic Dean.",
-    tags: ["Education", "Exam", "Schedule"]
+    tags: ["Education", "Exam", "Schedule"],
   },
   {
     id: "edu-result",
@@ -665,7 +665,7 @@ export const TEMPLATES: MailTemplate[] = [
     greeting: "Dear Student,",
     body: "Your grades have been uploaded to the portal database. Please log in to check your performance metrics.",
     footer: "Regards, Academic Registry.",
-    tags: ["Education", "Result", "Grades"]
+    tags: ["Education", "Result", "Grades"],
   },
   {
     id: "edu-workshop",
@@ -677,7 +677,7 @@ export const TEMPLATES: MailTemplate[] = [
     greeting: "Dear Student,",
     body: "We invite you to attend the hands-on technical workshop on full-stack coding. Registration is free but mandatory.",
     footer: "Sincerely, Training Coordinator.",
-    tags: ["Education", "Workshop", "Training"]
+    tags: ["Education", "Workshop", "Training"],
   },
   {
     id: "edu-seminar",
@@ -689,7 +689,7 @@ export const TEMPLATES: MailTemplate[] = [
     greeting: "Dear Colleague,",
     body: "We invite you to the guest lecture seminar on machine learning concepts. The lecture will be held in the main auditorium.",
     footer: "Regards, Department Head.",
-    tags: ["Education", "Seminar", "Invite"]
+    tags: ["Education", "Seminar", "Invite"],
   },
   {
     id: "edu-certificate",
@@ -701,7 +701,7 @@ export const TEMPLATES: MailTemplate[] = [
     greeting: "Dear Participant,",
     body: "Thank you for completing the training program. Please find your digital completion certificate attached.",
     footer: "Sincerely, Program Registry.",
-    tags: ["Education", "Certificate", "Congrats"]
+    tags: ["Education", "Certificate", "Congrats"],
   },
   {
     id: "edu-recommendation",
@@ -713,7 +713,7 @@ export const TEMPLATES: MailTemplate[] = [
     greeting: "To Whom It May Concern,",
     body: "I am writing to highly recommend this student. They have shown outstanding dedication during their project work under my supervision.",
     footer: "Best regards, Academic Advisor.",
-    tags: ["Education", "Recommendation", "Letter"]
+    tags: ["Education", "Recommendation", "Letter"],
   },
 
   // --- LEGAL ---
@@ -727,7 +727,7 @@ export const TEMPLATES: MailTemplate[] = [
     greeting: "Attention Recipient,",
     body: "This is a formal legal notice regarding your actions. Please take immediate corrective steps to avoid formal arbitration.",
     footer: "Sent via Secure Legal Notification Desk.",
-    tags: ["Legal", "Notice", "Warning"]
+    tags: ["Legal", "Notice", "Warning"],
   },
   {
     id: "leg-compliance",
@@ -739,7 +739,7 @@ export const TEMPLATES: MailTemplate[] = [
     greeting: "Attention Team,",
     body: "We require a compliance review on recent database operations to ensure absolute user data privacy.",
     footer: "Sincerely, Compliance Department Officer.",
-    tags: ["Legal", "Compliance", "Security"]
+    tags: ["Legal", "Compliance", "Security"],
   },
   {
     id: "leg-policy",
@@ -751,7 +751,7 @@ export const TEMPLATES: MailTemplate[] = [
     greeting: "Dear Users,",
     body: "Please review the updated corporate policies regarding data usage and security protocols.",
     footer: "Sincerely, Legal & Policy Department.",
-    tags: ["Legal", "Policy", "Update"]
+    tags: ["Legal", "Policy", "Update"],
   },
   {
     id: "leg-privacy",
@@ -763,7 +763,7 @@ export const TEMPLATES: MailTemplate[] = [
     greeting: "Dear User,",
     body: "We have revised our Privacy Notice to align with global standards. Please read the terms to understand how we secure your data.",
     footer: "Best regards, Data Privacy Committee.",
-    tags: ["Legal", "Privacy", "Compliance"]
+    tags: ["Legal", "Privacy", "Compliance"],
   },
   {
     id: "leg-nda",
@@ -775,7 +775,7 @@ export const TEMPLATES: MailTemplate[] = [
     greeting: "Dear Partner,",
     body: "This mutual Non-Disclosure Agreement binds both parties to absolute confidentiality regarding proprietary designs.",
     footer: "Sincerely, Legal Department.",
-    tags: ["Legal", "NDA", "Contract"]
+    tags: ["Legal", "NDA", "Contract"],
   },
   {
     id: "leg-terms",
@@ -787,7 +787,7 @@ export const TEMPLATES: MailTemplate[] = [
     greeting: "Dear User,",
     body: "We are writing to notify you that our terms of service agreement will be updated starting next month.",
     footer: "Sincerely, Terms Compliance Desk.",
-    tags: ["Legal", "Terms", "Update"]
+    tags: ["Legal", "Terms", "Update"],
   },
   {
     id: "leg-contract-notice",
@@ -799,7 +799,7 @@ export const TEMPLATES: MailTemplate[] = [
     greeting: "Dear Partner,",
     body: "Please find the formal notice for renewal of our mutual services agreement starting this quarter.",
     footer: "Sincerely, Contract Administrator.",
-    tags: ["Legal", "Contract", "Notice"]
+    tags: ["Legal", "Contract", "Notice"],
   },
   {
     id: "leg-case",
@@ -811,7 +811,7 @@ export const TEMPLATES: MailTemplate[] = [
     greeting: "Dear Partner,",
     body: "This is to inform you that our filing has been accepted. We will share the hearings schedule soon.",
     footer: "Best regards, Legal Advisor.",
-    tags: ["Legal", "Case", "Update"]
+    tags: ["Legal", "Case", "Update"],
   },
 
   // --- PERSONAL ---
@@ -825,7 +825,7 @@ export const TEMPLATES: MailTemplate[] = [
     greeting: "Hi there,",
     body: "I wanted to wish you a very happy birthday filled with joy, laughter, and success. Have a wonderful day!",
     footer: "Sent with warm wishes.",
-    tags: ["Personal", "Birthday", "Greeting"]
+    tags: ["Personal", "Birthday", "Greeting"],
   },
   {
     id: "pers-wedding",
@@ -837,7 +837,7 @@ export const TEMPLATES: MailTemplate[] = [
     greeting: "Dear Friends,",
     body: "We invite you to celebrate our wedding. Save the date and join us for this special occasion.",
     footer: "Sent with love, Save the Date.",
-    tags: ["Personal", "Wedding", "Invitation"]
+    tags: ["Personal", "Wedding", "Invitation"],
   },
   {
     id: "pers-congrats",
@@ -849,7 +849,7 @@ export const TEMPLATES: MailTemplate[] = [
     greeting: "Hey,",
     body: "I just heard the awesome news! Huge congratulations on this major milestone. You worked hard and deserved it.",
     footer: "Cheers! Sent with high regard.",
-    tags: ["Personal", "Congrats", "Celebration"]
+    tags: ["Personal", "Congrats", "Celebration"],
   },
   {
     id: "pers-thanks",
@@ -861,7 +861,7 @@ export const TEMPLATES: MailTemplate[] = [
     greeting: "Hi,",
     body: "I am writing this to say a huge thank you for your help. Your kindness made a huge difference to me.",
     footer: "With gratitude,",
-    tags: ["Personal", "Thank You", "Appreciation"]
+    tags: ["Personal", "Thank You", "Appreciation"],
   },
   {
     id: "pers-farewell",
@@ -873,7 +873,7 @@ export const TEMPLATES: MailTemplate[] = [
     greeting: "Dear Colleague,",
     body: "As you move on to your next adventure, I want to say it was an honor working with you. Keep in touch!",
     footer: "With warm wishes for your future.",
-    tags: ["Personal", "Farewell", "Exit"]
+    tags: ["Personal", "Farewell", "Exit"],
   },
   {
     id: "pers-apology",
@@ -885,7 +885,7 @@ export const TEMPLATES: MailTemplate[] = [
     greeting: "Hi,",
     body: "I wanted to apologize for the misunderstanding last week. I value our connection and hope we can clear the air.",
     footer: "Warm regards,",
-    tags: ["Personal", "Apology"]
+    tags: ["Personal", "Apology"],
   },
   {
     id: "pers-sympathy",
@@ -897,7 +897,7 @@ export const TEMPLATES: MailTemplate[] = [
     greeting: "Dear Friend,",
     body: "I am deeply sorry for your loss. My thoughts and prayers are with you and your family during this difficult time.",
     footer: "With deepest sympathy,",
-    tags: ["Personal", "Sympathy"]
+    tags: ["Personal", "Sympathy"],
   },
   {
     id: "pers-invite",
@@ -909,7 +909,7 @@ export const TEMPLATES: MailTemplate[] = [
     greeting: "Hi,",
     body: "We are hosting a small get-together this weekend and would love for you to join us. Let me know if you can make it.",
     footer: "Warmly,",
-    tags: ["Personal", "Invitation"]
+    tags: ["Personal", "Invitation"],
   },
   {
     id: "pers-celebration",
@@ -921,7 +921,7 @@ export const TEMPLATES: MailTemplate[] = [
     greeting: "Hey,",
     body: "Let's celebrate the new project milestone! Join us this Friday evening for drinks and dinner.",
     footer: "Cheers! RSVP link attached.",
-    tags: ["Personal", "Celebration", "Event"]
+    tags: ["Personal", "Celebration", "Event"],
   },
   {
     id: "pers-greeting",
@@ -933,7 +933,7 @@ export const TEMPLATES: MailTemplate[] = [
     greeting: "Hi there,",
     body: "Wishing you a warm and joyful holiday season. May the new year bring peace and happiness to you and your loved ones.",
     footer: "Warmest wishes,",
-    tags: ["Personal", "Greeting"]
+    tags: ["Personal", "Greeting"],
   },
 
   // --- CUSTOM ---
@@ -947,6 +947,6 @@ export const TEMPLATES: MailTemplate[] = [
     greeting: "Dear [Name],",
     body: "",
     footer: "Regards, [Name/Department]",
-    tags: ["Custom", "Blank", "Professional"]
-  }
+    tags: ["Custom", "Blank", "Professional"],
+  },
 ];

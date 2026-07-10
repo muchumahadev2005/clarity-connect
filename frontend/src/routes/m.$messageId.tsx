@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import api from "@/lib/api";
 import { MessageDetail } from "@/components/securesend/MessageDetail";
 import type { SecureMessage } from "@/components/securesend/types";
@@ -17,7 +17,7 @@ function MessageViewerPage() {
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<SecureMessage | null>(null);
 
-  const fetchMessage = async () => {
+  const fetchMessage = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -49,33 +49,36 @@ function MessageViewerPage() {
         logs: [],
         encrypted: hasEncryptedPayload
           ? {
-            encryptedData: m.encryptedData,
-            encryptedAESKey: m.encryptedAESKey,
-            iv: m.iv,
-            salt: m.salt,
-            keyIv: m.keyIv,
-            encryptionMode: m.encryptionMode,
-            kdf: m.kdf,
-            kdfIterations: m.kdfIterations,
-            aesAlgorithm: m.aesAlgorithm,
-            rsaAlgorithm: m.rsaAlgorithm,
-            mode: "hybrid",
-          }
+              encryptedData: m.encryptedData,
+              encryptedAESKey: m.encryptedAESKey,
+              iv: m.iv,
+              salt: m.salt,
+              keyIv: m.keyIv,
+              encryptionMode: m.encryptionMode,
+              kdf: m.kdf,
+              kdfIterations: m.kdfIterations,
+              aesAlgorithm: m.aesAlgorithm,
+              rsaAlgorithm: m.rsaAlgorithm,
+              mode: "hybrid",
+            }
           : undefined,
       };
 
       setMessage(mapped);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Failed to load message", err);
-      setError(err.response?.data?.message || "Failed to load secure message. The link might be invalid or expired.");
+      const errorMsg =
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+        "Failed to load secure message. The link might be invalid or expired.";
+      setError(errorMsg);
     } finally {
       setLoading(false);
     }
-  };
+  }, [messageId]);
 
   useEffect(() => {
     fetchMessage();
-  }, [messageId]);
+  }, [fetchMessage]);
 
   const handleDelete = async (id: string) => {
     try {
@@ -142,9 +145,7 @@ function MessageViewerPage() {
               <Lock className="h-7 w-7" />
             </div>
             <h1 className="text-xl font-bold tracking-tight">Access Denied</h1>
-            <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
-              {error}
-            </p>
+            <p className="mt-2 text-sm text-muted-foreground leading-relaxed">{error}</p>
             <div className="mt-6 flex justify-center gap-3">
               <Link
                 to="/landing"

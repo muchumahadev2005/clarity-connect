@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Play, Pause, Mic } from "lucide-react";
 
-export function VoicePlayer({ duration = 32, audioSrc }: { duration?: number, audioSrc?: string }) {
+export function VoicePlayer({ duration = 32, audioSrc }: { duration?: number; audioSrc?: string }) {
   const [playing, setPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
@@ -92,7 +92,8 @@ export function VoicePlayer({ duration = 32, audioSrc }: { duration?: number, au
                   style={{
                     height: `${h}px`,
                     backgroundColor: active ? "var(--color-primary)" : "oklch(0.88 0.01 250)",
-                    transform: playing && active ? `scaleY(${0.8 + ((i * 17) % 10) / 30})` : "scaleY(1)",
+                    transform:
+                      playing && active ? `scaleY(${0.8 + ((i * 17) % 10) / 30})` : "scaleY(1)",
                     transition: "transform 0.3s ease, background-color 0.2s ease",
                   }}
                 />

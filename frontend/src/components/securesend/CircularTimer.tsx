@@ -36,7 +36,15 @@ export function CircularTimer({ remainingMs, totalMs, expired }: Props) {
     >
       <div className="relative h-12 w-12 shrink-0">
         <svg viewBox="0 0 52 52" className="h-12 w-12 -rotate-90">
-          <circle cx="26" cy="26" r={r} stroke="currentColor" strokeWidth="4" className="text-border" fill="none" />
+          <circle
+            cx="26"
+            cy="26"
+            r={r}
+            stroke="currentColor"
+            strokeWidth="4"
+            className="text-border"
+            fill="none"
+          />
           <circle
             cx="26"
             cy="26"
@@ -52,7 +60,11 @@ export function CircularTimer({ remainingMs, totalMs, expired }: Props) {
         </svg>
         <Timer
           className={`absolute inset-0 m-auto h-4 w-4 ${
-            expired || urgent ? "text-destructive" : warning ? "text-warning-foreground" : "text-primary"
+            expired || urgent
+              ? "text-destructive"
+              : warning
+                ? "text-warning-foreground"
+                : "text-primary"
           } ${urgent && !expired ? "animate-pulse" : ""}`}
         />
       </div>
@@ -62,7 +74,11 @@ export function CircularTimer({ remainingMs, totalMs, expired }: Props) {
         </p>
         <p
           className={`font-mono text-sm font-semibold tabular-nums ${
-            expired || urgent ? "text-destructive" : warning ? "text-warning-foreground" : "text-foreground"
+            expired || urgent
+              ? "text-destructive"
+              : warning
+                ? "text-warning-foreground"
+                : "text-foreground"
           }`}
         >
           {expired ? "00:00" : formatCountdown(remainingMs)}

@@ -59,7 +59,7 @@ export function SharePanel({ open, link, summary, onClose }: Props) {
         <a
           href={`https://wa.me/?text=${encodeURIComponent(`Secure message: ${link}`)}`}
           target="_blank"
-          rel="noreferrer"
+          rel="noopener noreferrer"
           className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-surface px-4 py-2.5 text-sm font-medium hover:bg-secondary"
         >
           <MessageCircle className="h-4 w-4 text-success" /> Share on WhatsApp

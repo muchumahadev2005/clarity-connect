@@ -128,8 +128,11 @@ function SignupPage() {
       setOtpError(null);
       setResendIn(30);
       toast.success(`Code sent to ${maskEmail(email.trim())}`);
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || "Failed to send OTP");
+    } catch (err: unknown) {
+      toast.error(
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+          "Failed to send OTP",
+      );
     } finally {
       setSending(false);
     }
@@ -143,7 +146,7 @@ function SignupPage() {
       setOtpError(null);
       setResendIn(30);
       toast.success("New code sent");
-    } catch (err: any) {
+    } catch (err: unknown) {
       toast.error("Failed to resend OTP");
     }
   };
@@ -187,8 +190,11 @@ function SignupPage() {
     try {
       await api.post("/auth/verify-otp", { email: email.trim(), otp: code });
       setStep("password");
-    } catch (err: any) {
-      setOtpError(err.response?.data?.message || "Incorrect code. Try again.");
+    } catch (err: unknown) {
+      setOtpError(
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+          "Incorrect code. Try again.",
+      );
     } finally {
       setVerifying(false);
     }
@@ -217,8 +223,11 @@ function SignupPage() {
       localStorage.setItem("isLoggedIn", "true");
       setStep("success");
       setTimeout(() => navigate({ to: "/" }), 1400);
-    } catch (err: any) {
-      setPasswordError(err.response?.data?.message || "Failed to create account");
+    } catch (err: unknown) {
+      setPasswordError(
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+          "Failed to create account",
+      );
     } finally {
       setCreating(false);
     }
@@ -235,7 +244,10 @@ function SignupPage() {
 
       <div className="mx-auto flex min-h-screen w-full max-w-md flex-col items-center justify-center px-4 py-10">
         {/* Brand */}
-        <Link to="/landing" className="mb-6 flex items-center gap-2 hover:opacity-90 transition-opacity">
+        <Link
+          to="/landing"
+          className="mb-6 flex items-center gap-2 hover:opacity-90 transition-opacity"
+        >
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-elegant">
             <ShieldCheck className="h-6 w-6" />
           </div>
@@ -340,7 +352,10 @@ function SignupPage() {
                 </p>
               </div>
 
-              <div className="grid grid-cols-6 gap-2 sm:gap-3 justify-center" onPaste={handleOtpPaste}>
+              <div
+                className="grid grid-cols-6 gap-2 sm:gap-3 justify-center"
+                onPaste={handleOtpPaste}
+              >
                 {otp.map((d, i) => (
                   <input
                     key={i}

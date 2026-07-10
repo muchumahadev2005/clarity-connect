@@ -1,4 +1,14 @@
-import { Inbox, Send, TimerOff, Activity, ShieldCheck, Plus, Menu, VenetianMask, LogOut } from "lucide-react";
+import {
+  Inbox,
+  Send,
+  TimerOff,
+  Activity,
+  ShieldCheck,
+  Plus,
+  Menu,
+  VenetianMask,
+  LogOut,
+} from "lucide-react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import type { Folder } from "./types";
 import { cn } from "@/lib/utils";
@@ -46,9 +56,7 @@ export function Sidebar({ active, onSelect, onCompose, counts, collapsed, onTogg
         className={cn(
           "flex flex-col border-r border-border bg-surface transition-all duration-300 ease-in-out z-50",
           "fixed inset-y-0 left-0 lg:static",
-          collapsed 
-            ? "-translate-x-full lg:translate-x-0 lg:w-18" 
-            : "translate-x-0 w-70",
+          collapsed ? "-translate-x-full lg:translate-x-0 lg:w-18" : "translate-x-0 w-70",
         )}
       >
         <div className="flex items-center gap-2 px-4 py-4">
@@ -59,8 +67,12 @@ export function Sidebar({ active, onSelect, onCompose, counts, collapsed, onTogg
           >
             <Menu className="h-5 w-5 text-muted-foreground" />
           </button>
-          {(!collapsed || (collapsed && typeof window !== "undefined" && window.innerWidth < 1024)) && (
-            <Link to="/" className="flex items-center gap-2 animate-in fade-in slide-in-from-left-2 hover:opacity-90 transition-opacity">
+          {(!collapsed ||
+            (collapsed && typeof window !== "undefined" && window.innerWidth < 1024)) && (
+            <Link
+              to="/"
+              className="flex items-center gap-2 animate-in fade-in slide-in-from-left-2 hover:opacity-90 transition-opacity"
+            >
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
                 <ShieldCheck className="h-5 w-5" />
               </div>
@@ -79,9 +91,12 @@ export function Sidebar({ active, onSelect, onCompose, counts, collapsed, onTogg
               "group flex items-center gap-3 rounded-2xl bg-primary-soft text-accent-foreground font-medium shadow-elegant hover:shadow-floating transition-all",
               collapsed ? "lg:h-12 lg:w-12 lg:justify-center h-14 w-full px-4" : "h-14 w-full px-4",
             )}
+            aria-label="New secure message"
           >
             <Plus className="h-5 w-5 shrink-0" />
-            {( !collapsed || (collapsed && window.innerWidth < 1024)) && <span>New Secure Message</span>}
+            {(!collapsed || (collapsed && window.innerWidth < 1024)) && (
+              <span>New Secure Message</span>
+            )}
           </button>
         </div>
 
@@ -98,11 +113,13 @@ export function Sidebar({ active, onSelect, onCompose, counts, collapsed, onTogg
                 }}
                 className={cn(
                   "flex w-full items-center gap-4 rounded-r-full pl-6 pr-4 py-2 text-sm transition-colors",
-                  collapsed && "lg:justify-center lg:pl-0 lg:pr-0 lg:py-3 lg:rounded-full lg:mx-auto lg:w-12",
+                  collapsed &&
+                    "lg:justify-center lg:pl-0 lg:pr-0 lg:py-3 lg:rounded-full lg:mx-auto lg:w-12",
                   isActive
                     ? "bg-primary-soft text-accent-foreground font-semibold"
                     : "text-foreground/80 hover:bg-secondary",
                 )}
+                aria-label={it.label}
               >
                 <Icon className="h-5 w-5 shrink-0" />
                 {(!collapsed || (collapsed && window.innerWidth < 1024)) && (
@@ -132,10 +149,12 @@ export function Sidebar({ active, onSelect, onCompose, counts, collapsed, onTogg
 
         <div className={cn("border-t border-border px-2 py-2", collapsed && "lg:px-1")}>
           {user && (
-            <div className={cn(
-              "mb-2 flex items-center gap-3 rounded-xl px-4 py-3 transition-colors",
-              collapsed ? "lg:justify-center lg:px-0" : ""
-            )}>
+            <div
+              className={cn(
+                "mb-2 flex items-center gap-3 rounded-xl px-4 py-3 transition-colors",
+                collapsed ? "lg:justify-center lg:px-0" : "",
+              )}
+            >
               <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary-soft text-primary font-bold text-xs">
                 {user.email.charAt(0).toUpperCase()}
               </div>
@@ -150,24 +169,34 @@ export function Sidebar({ active, onSelect, onCompose, counts, collapsed, onTogg
 
           <Link
             to="/anonymous"
-            onClick={() => { if (window.innerWidth < 1024) onToggle(); }}
+            onClick={() => {
+              if (window.innerWidth < 1024) onToggle();
+            }}
             className={cn(
               "flex items-center gap-4 rounded-r-full pl-6 pr-4 py-2 text-sm transition-colors text-foreground/80 hover:bg-anon-soft hover:text-anon",
-              collapsed && "lg:justify-center lg:pl-0 lg:pr-0 lg:py-3 lg:rounded-full lg:mx-auto lg:w-12",
+              collapsed &&
+                "lg:justify-center lg:pl-0 lg:pr-0 lg:py-3 lg:rounded-full lg:mx-auto lg:w-12",
             )}
+            aria-label="Anonymous messaging"
           >
             <VenetianMask className="h-5 w-5 shrink-0 text-anon" />
-            {(!collapsed || (collapsed && window.innerWidth < 1024)) && <span className="flex-1 text-left">Anonymous 🎭</span>}
+            {(!collapsed || (collapsed && window.innerWidth < 1024)) && (
+              <span className="flex-1 text-left">Anonymous 🎭</span>
+            )}
           </Link>
           <button
             onClick={handleLogout}
             className={cn(
               "flex w-full items-center gap-4 rounded-r-full pl-6 pr-4 py-2 text-sm transition-colors text-foreground/80 hover:bg-destructive/10 hover:text-destructive mt-1",
-              collapsed && "lg:justify-center lg:pl-0 lg:pr-0 lg:py-3 lg:rounded-full lg:mx-auto lg:w-12",
+              collapsed &&
+                "lg:justify-center lg:pl-0 lg:pr-0 lg:py-3 lg:rounded-full lg:mx-auto lg:w-12",
             )}
+            aria-label="Log out"
           >
             <LogOut className="h-5 w-5 shrink-0" />
-            {(!collapsed || (collapsed && window.innerWidth < 1024)) && <span className="flex-1 text-left">Log out</span>}
+            {(!collapsed || (collapsed && window.innerWidth < 1024)) && (
+              <span className="flex-1 text-left">Log out</span>
+            )}
           </button>
         </div>
       </aside>

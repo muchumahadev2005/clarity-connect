@@ -1,4 +1,17 @@
-import { Lock, KeyRound, Eye, FileText, Paperclip, Search, EyeOff, Sparkles, Zap, Menu, TimerOff, Inbox } from "lucide-react";
+import {
+  Lock,
+  KeyRound,
+  Eye,
+  FileText,
+  Paperclip,
+  Search,
+  EyeOff,
+  Sparkles,
+  Zap,
+  Menu,
+  TimerOff,
+  Inbox,
+} from "lucide-react";
 import type { Folder, SecureMessage } from "./types";
 import { cn } from "@/lib/utils";
 import { timeAgo } from "./utils";
@@ -52,7 +65,15 @@ function ProtectionBadge({ m }: { m: SecureMessage }) {
   );
 }
 
-export function MessageList({ folder, messages, selectedId, onSelect, query, onQuery, onToggleSidebar }: Props) {
+export function MessageList({
+  folder,
+  messages,
+  selectedId,
+  onSelect,
+  query,
+  onQuery,
+  onToggleSidebar,
+}: Props) {
   return (
     <div className="flex h-full flex-col bg-surface">
       <div className="border-b border-border px-5 py-4">
@@ -89,7 +110,8 @@ export function MessageList({ folder, messages, selectedId, onSelect, query, onQ
               </div>
               <h3 className="text-lg font-semibold text-foreground">No expired messages</h3>
               <p className="mt-1 max-w-xs text-sm">
-                Messages that have reached their self-destruct limit will appear here for reference after their content is wiped.
+                Messages that have reached their self-destruct limit will appear here for reference
+                after their content is wiped.
               </p>
             </div>
           ) : (
@@ -123,7 +145,10 @@ export function MessageList({ folder, messages, selectedId, onSelect, query, onQ
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between gap-2">
                         <span className="truncate text-sm">{m.sender}</span>
-                        <span suppressHydrationWarning className="shrink-0 text-[11px] text-muted-foreground">
+                        <span
+                          suppressHydrationWarning
+                          className="shrink-0 text-[11px] text-muted-foreground"
+                        >
                           {timeAgo(m.timestamp)}
                         </span>
                       </div>
