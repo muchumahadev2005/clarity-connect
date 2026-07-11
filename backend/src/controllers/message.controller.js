@@ -276,19 +276,23 @@ exports.markViewed = async (req, res, next) => {
       }
     }
 
-    // Update views and logs
-    message.views += 1;
-    message.logs.push({
-      viewedAt: new Date(),
-      ip: req.ip || req.connection.remoteAddress || '127.0.0.1',
-      device: fullDeviceInfo,
-      userId: viewerId
-    });
+    // Update views and logs only if the viewer is NOT the sender
+    const isSender = viewerId && message.senderId && viewerId.toString() === message.senderId.toString();
 
-    await message.save();
+    if (!isSender) {
+      message.views += 1;
+      message.logs.push({
+        viewedAt: new Date(),
+        ip: req.ip || req.connection.remoteAddress || '127.0.0.1',
+        device: fullDeviceInfo,
+        userId: viewerId
+      });
 
-    if (message.viewOnce && (message.encryptedData || message.encryptedAESKey || message.iv || message.password || message.fileUrl)) {
-      await wipeMessagePayload(message);
+      await message.save();
+
+      if (message.viewOnce && (message.encryptedData || message.encryptedAESKey || message.iv || message.password || message.fileUrl)) {
+        await wipeMessagePayload(message);
+      }
     }
 
     // Fetch updated message with populated log users

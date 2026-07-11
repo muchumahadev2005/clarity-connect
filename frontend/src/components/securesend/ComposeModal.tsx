@@ -63,6 +63,7 @@ interface Props {
 }
 
 const expiries = [
+  { label: "Off", value: 0 },
   { label: "10 sec", value: 1 / 6 },
   { label: "1 min", value: 1 },
   { label: "10 min", value: 10 },
@@ -102,6 +103,18 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
   const [password, setPassword] = useState("");
   const [expiry, setExpiry] = useState(10);
   const [viewOnce, setViewOnce] = useState(false);
+
+  const handleToggleViewOnce = () => {
+    setViewOnce((prev) => {
+      const next = !prev;
+      if (next) {
+        setExpiry(0);
+      } else {
+        setExpiry(10);
+      }
+      return next;
+    });
+  };
   const [recording, setRecording] = useState(false);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [audioFileName, setAudioFileName] = useState<string | null>(null);
@@ -218,7 +231,6 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
   const [hybridReceiverPubKey, setHybridReceiverPubKey] = useState("");
   const [aesKeyPreview, setAesKeyPreview] = useState("");
   const [rsaWrappedKeyPreview, setRsaWrappedKeyPreview] = useState("");
-
   // Auto-fetch receiver's public key when email is entered in hybrid mode
   useEffect(() => {
     if (protection !== "hybrid" || !hybridReceiver.trim()) {
@@ -460,36 +472,41 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
       setEncStep(1);
 
       let encrypted: EncryptedPayload;
-      if (protection === "key" || protection === "password") {
+
+      if (protection === "key" || protection === "password" || protection === "quick") {
         setEncStep(2);
-        const secret = protection === "key" ? normalizeSecretKey(password) : password;
+        const secret =
+          protection === "quick"
+            ? "securesend_default"
+            : protection === "key"
+              ? normalizeSecretKey(password)
+              : password;
+
         const envelope = JSON.stringify({
           v: 1,
           protection,
           password: secret || null,
           body: finalContent,
         });
+
         const base = await symmetricEncrypt(envelope, secret, (aesBase64, wrappedBase64) => {
           setAesKeyPreview(aesBase64);
           setRsaWrappedKeyPreview(wrappedBase64);
         });
+
         encrypted = {
           ...base,
           mode: "demo",
           receiver: null,
         };
       } else {
-        // Quick or Hybrid mode (uses RSA)
+        // Hybrid mode (uses RSA)
         // Step 1: select RSA public key.
         let publicKey: CryptoKey;
-        if (protection === "hybrid") {
-          try {
-            publicKey = await importPublicKey(hybridReceiverPubKey);
-          } catch {
-            throw new Error("Invalid receiver public key");
-          }
-        } else {
-          publicKey = (await loadOrCreateRSAKeyPair()).publicKey;
+        try {
+          publicKey = await importPublicKey(hybridReceiverPubKey);
+        } catch {
+          throw new Error("Invalid receiver public key");
         }
         setEncStep(2);
         // Step 2: encrypt envelope (body + protection metadata) with AES-GCM,
@@ -500,20 +517,14 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
           password: password || null,
           body: finalContent,
         });
-        const base =
-          protection === "hybrid"
-            ? await hybridEncrypt(envelope, publicKey, (aesBase64, wrappedBase64) => {
-                setAesKeyPreview(aesBase64);
-                setRsaWrappedKeyPreview(wrappedBase64);
-              })
-            : await hybridEncrypt(envelope, publicKey, (aesBase64, wrappedBase64) => {
-                setAesKeyPreview(aesBase64);
-                setRsaWrappedKeyPreview(wrappedBase64);
-              });
+        const base = await hybridEncrypt(envelope, publicKey, (aesBase64, wrappedBase64) => {
+          setAesKeyPreview(aesBase64);
+          setRsaWrappedKeyPreview(wrappedBase64);
+        });
         encrypted = {
           ...base,
           mode: "hybrid",
-          receiver: protection === "hybrid" ? hybridReceiver.trim() : null,
+          receiver: hybridReceiver.trim(),
         };
       }
       setEncStep(3);
@@ -526,9 +537,11 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
         password:
           protection === "hybrid"
             ? ""
-            : protection === "key"
-              ? normalizeSecretKey(password)
-              : password,
+            : protection === "quick"
+              ? "securesend_default"
+              : protection === "key"
+                ? normalizeSecretKey(password)
+                : password,
         expiry,
         viewOnce,
         link,
@@ -856,7 +869,7 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
           </div>
 
           {/* Expiry */}
-          <div>
+          <div className={cn("transition-opacity duration-200", viewOnce && "opacity-50 pointer-events-none")}>
             <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               <Timer className="h-3.5 w-3.5" /> Self-destruct
             </p>
@@ -864,10 +877,12 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
               {expiries.map((e) => (
                 <button
                   key={e.label}
+                  type="button"
+                  disabled={viewOnce}
                   onClick={() => setExpiry(e.value)}
                   className={cn(
                     "rounded-full border px-3 py-1.5 text-xs transition",
-                    expiry === e.value
+                    !viewOnce && expiry === e.value
                       ? "border-primary bg-primary text-primary-foreground"
                       : "border-border text-foreground/80 hover:bg-secondary",
                   )}
@@ -891,7 +906,7 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
             </div>
             <button
               type="button"
-              onClick={() => setViewOnce((v) => !v)}
+              onClick={handleToggleViewOnce}
               className={cn(
                 "relative h-6 w-11 rounded-full transition",
                 viewOnce ? "bg-primary" : "bg-border",

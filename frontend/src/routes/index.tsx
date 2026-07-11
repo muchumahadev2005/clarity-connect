@@ -198,6 +198,30 @@ function SecureSendApp() {
     return () => clearInterval(interval);
   }, []);
 
+  // When the user changes selection or leaves the message folder, check if the previously
+  // selected message was a view-once message that has been decrypted/viewed. If so,
+  // mark it as expired in the local state so they can't open it again.
+  useEffect(() => {
+    setMessages((prevMsgs) => {
+      let changed = false;
+      const nextMsgs = prevMsgs.map((m) => {
+        const isNotCurrentlyOpen = m.id !== selectedId || folder === "logs";
+        if (m.viewOnce && m.views > 0 && isNotCurrentlyOpen && m.status !== "expired") {
+          changed = true;
+          return {
+            ...m,
+            status: "expired" as const,
+            content: "",
+            preview: "Message destructed or expired",
+            encrypted: undefined,
+          };
+        }
+        return m;
+      });
+      return changed ? nextMsgs : prevMsgs;
+    });
+  }, [selectedId, folder]);
+
   // Auto-collapse sidebar on small screens.
   useEffect(() => {
     const mq = window.matchMedia("(max-width: 1024px)");
@@ -412,9 +436,10 @@ function SecureSendApp() {
             toast.success("Message encrypted and sent!");
 
             if (p.sendMode === "link") {
+              const hash = p.link.includes("#") ? p.link.substring(p.link.indexOf("#")) : "";
               setShare({
                 open: true,
-                link: `${window.location.origin}/m/${res.data.data._id}`, // Use real ID from backend
+                link: `${window.location.origin}/m/${res.data.data._id}${hash}`, // Preserve key in URL hash if present
                 summary: {
                   protection:
                     p.protection === "password"
@@ -425,11 +450,13 @@ function SecureSendApp() {
                           ? "Hybrid"
                           : "Quick",
                   expiry:
-                    p.expiry < 1
-                      ? "10 sec"
-                      : p.expiry < 60
-                        ? `${p.expiry} min`
-                        : `${p.expiry / 60} hr`,
+                    p.expiry === 0
+                      ? "Off"
+                      : p.expiry < 1
+                        ? "10 sec"
+                        : p.expiry < 60
+                          ? `${p.expiry} min`
+                          : `${p.expiry / 60} hr`,
                   viewOnce: p.viewOnce,
                 },
               });

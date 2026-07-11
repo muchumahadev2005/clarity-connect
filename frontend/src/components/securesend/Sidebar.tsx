@@ -38,7 +38,7 @@ export function Sidebar({ active, onSelect, onCompose, counts, collapsed, onTogg
     localStorage.removeItem("isLoggedIn");
     localStorage.removeItem("token");
     clearStoredRSAKeys();
-    navigate({ to: "/" });
+    window.location.href = "/landing";
   };
 
   return (
