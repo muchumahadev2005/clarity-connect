@@ -71,6 +71,23 @@ exports.sendMessage = async (req, res, next) => {
     }
 
     const senderId = req.user.id;
+
+    if (type === 'voice') {
+      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+      const voiceCount = await Message.countDocuments({
+        senderId,
+        type: 'voice',
+        createdAt: { $gte: oneHourAgo }
+      });
+
+      if (voiceCount >= 10) {
+        return res.status(429).json({
+          success: false,
+          message: 'You have reached the hourly limit of 10 voice messages. Please try again later.'
+        });
+      }
+    }
+
     let receiverId = null;
 
     if (recipientEmail) {

@@ -173,7 +173,15 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
     } else {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        const recorder = new MediaRecorder(stream);
+        
+        let options = {};
+        if (MediaRecorder.isTypeSupported("audio/webm;codecs=opus")) {
+          options = { mimeType: "audio/webm;codecs=opus" };
+        } else if (MediaRecorder.isTypeSupported("audio/ogg;codecs=opus")) {
+          options = { mimeType: "audio/ogg;codecs=opus" };
+        }
+        
+        const recorder = new MediaRecorder(stream, options);
         mediaRecorderRef.current = recorder;
         audioChunksRef.current = [];
 
@@ -182,7 +190,9 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
         };
 
         recorder.onstop = () => {
-          const blob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+          const blob = new Blob(audioChunksRef.current, {
+            type: recorder.mimeType || "audio/webm;codecs=opus",
+          });
           if (blob.size > MAX_VOICE_SIZE_BYTES) {
             setAudioBlob(null);
             setAudioFileName(null);
@@ -229,6 +239,32 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
   // Hybrid mode state
   const [hybridReceiver, setHybridReceiver] = useState("");
   const [hybridReceiverPubKey, setHybridReceiverPubKey] = useState("");
+  const [suggestions, setSuggestions] = useState<{ email: string; publicKey?: string | null }[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+
+  // Autocomplete email search suggestions
+  useEffect(() => {
+    const query = hybridReceiver.trim();
+    if (!query) {
+      setSuggestions([]);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      try {
+        const apiUrl = `/users/search?q=${encodeURIComponent(query)}&protection=${protection}`;
+        const res = await api.get(apiUrl);
+        if (res.data && res.data.data) {
+          setSuggestions(res.data.data);
+        }
+      } catch (err) {
+        console.error("Suggestions fetch error:", err);
+      }
+    }, 150); // Small debounce for autocomplete suggestions
+
+    return () => clearTimeout(timer);
+  }, [hybridReceiver, protection]);
+
   const [aesKeyPreview, setAesKeyPreview] = useState("");
   const [rsaWrappedKeyPreview, setRsaWrappedKeyPreview] = useState("");
   // Auto-fetch receiver's public key when email is entered in hybrid mode
@@ -391,9 +427,11 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
       }
     } else if (tab === "voice") {
       const hourlyKey = getHourKey("voice_sends");
-      if (getCount(hourlyKey) >= HOURLY_VOICE_LIMIT) {
+      const isLoggedIn = typeof window !== "undefined" && localStorage.getItem("isLoggedIn") === "true";
+      const limit = isLoggedIn ? 10 : HOURLY_VOICE_LIMIT;
+      if (getCount(hourlyKey) >= limit) {
         toast.error(
-          `Hourly limit reached. You can only send ${HOURLY_VOICE_LIMIT} voice messages per hour.`,
+          `Hourly limit reached. You can only send ${limit} voice messages per hour.`,
         );
         return;
       }
@@ -752,16 +790,49 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
             </div>
             {protection === "hybrid" && (
               <div className="mt-3 space-y-3 animate-fade-in">
-                <div>
+                <div className="relative">
                   <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                     Receiver
                   </label>
                   <input
                     value={hybridReceiver}
-                    onChange={(e) => setHybridReceiver(e.target.value)}
+                    onChange={(e) => {
+                      setHybridReceiver(e.target.value);
+                      setShowSuggestions(true);
+                    }}
+                    onFocus={() => setShowSuggestions(true)}
                     placeholder="Enter receiver email (public key will auto-load)"
                     className="w-full rounded-xl border border-border bg-surface px-3.5 py-2.5 text-sm outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/15"
                   />
+                  {showSuggestions && suggestions.length > 0 && (
+                    <>
+                      <div
+                        className="fixed inset-0 z-40 bg-transparent"
+                        onClick={() => setShowSuggestions(false)}
+                      />
+                      <div className="absolute z-50 mt-1 max-h-48 w-full overflow-y-auto rounded-xl border border-border bg-surface shadow-floating scrollbar-thin">
+                        {suggestions.map((s) => (
+                          <button
+                            key={s.email}
+                            type="button"
+                            onClick={() => {
+                              setHybridReceiver(s.email);
+                              setHybridReceiverPubKey(s.publicKey || "");
+                              setShowSuggestions(false);
+                            }}
+                            className="flex w-full items-center px-4 py-2.5 text-left text-xs hover:bg-secondary transition-colors"
+                          >
+                            <span className="font-medium text-foreground">{s.email}</span>
+                            {s.publicKey && (
+                              <span className="ml-auto rounded-full bg-primary-soft px-1.5 py-0.5 text-[9px] font-semibold text-primary">
+                                Key Found
+                              </span>
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
             )}
@@ -960,16 +1031,44 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
             </div>
 
             {sendMode === "direct" && protection !== "hybrid" && (
-              <div className="mt-2">
+              <div className="mt-2 relative">
                 <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                   Receiver
                 </label>
                 <input
                   value={hybridReceiver}
-                  onChange={(e) => setHybridReceiver(e.target.value)}
-                  placeholder="Enter receiver email (public key will auto-load)"
+                  onChange={(e) => {
+                    setHybridReceiver(e.target.value);
+                    setShowSuggestions(true);
+                  }}
+                  onFocus={() => setShowSuggestions(true)}
+                  placeholder="Enter receiver email"
                   className="w-full rounded-xl border border-border bg-surface px-3.5 py-2.5 text-sm outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/15"
                 />
+                {showSuggestions && suggestions.length > 0 && (
+                  <>
+                    <div
+                      className="fixed inset-0 z-40 bg-transparent"
+                      onClick={() => setShowSuggestions(false)}
+                    />
+                    <div className="absolute z-50 mt-1 max-h-48 w-full overflow-y-auto rounded-xl border border-border bg-surface shadow-floating scrollbar-thin">
+                      {suggestions.map((s) => (
+                        <button
+                          key={s.email}
+                          type="button"
+                          onClick={() => {
+                            setHybridReceiver(s.email);
+                            setHybridReceiverPubKey(s.publicKey || "");
+                            setShowSuggestions(false);
+                          }}
+                          className="flex w-full items-center px-4 py-2.5 text-left text-xs hover:bg-secondary transition-colors"
+                        >
+                          <span className="font-medium text-foreground">{s.email}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
               </div>
             )}
           </div>

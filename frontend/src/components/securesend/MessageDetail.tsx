@@ -55,6 +55,7 @@ export function MessageDetail({ message, onDelete, onMarkViewed }: Props) {
   const [decrypting, setDecrypting] = useState(false);
   const [decryptStep, setDecryptStep] = useState(0);
   const [decryptedBody, setDecryptedBody] = useState<string | null>(null);
+  const [audioBlobUrl, setAudioBlobUrl] = useState<string | null>(null);
   const [aesKeyPreview, setAesKeyPreview] = useState("");
   const [rsaWrappedKeyPreview, setRsaWrappedKeyPreview] = useState("");
   const [privateKeyPassphrase, setPrivateKeyPassphrase] = useState("");
@@ -63,6 +64,45 @@ export function MessageDetail({ message, onDelete, onMarkViewed }: Props) {
   );
   const [decryptionError, setDecryptionError] = useState<string | null>(null);
   const now = useStableNow(!!message);
+
+  // Convert decrypted data URL to Blob URL for reliable audio playback
+  useEffect(() => {
+    let objectUrl: string | null = null;
+
+    if (decryptedBody && message?.type === "voice") {
+      try {
+        if (decryptedBody.startsWith("data:")) {
+          const arr = decryptedBody.split(",");
+          // Extract everything between "data:" and ";base64" to keep codecs info
+          const mimeMatch = arr[0].match(/data:(.*?);base64/i);
+          const mime = mimeMatch ? mimeMatch[1] : "audio/webm";
+          const b64 = arr[1];
+          const binary = atob(b64);
+          const bytes = new Uint8Array(binary.length);
+          for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+          const blob = new Blob([bytes], { type: mime });
+          objectUrl = URL.createObjectURL(blob);
+          console.log(`[AudioBlob] Created Blob URL with type: ${mime}, size: ${blob.size} bytes`);
+        } else {
+          const binary = atob(decryptedBody);
+          const bytes = new Uint8Array(binary.length);
+          for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+          const blob = new Blob([bytes], { type: "audio/webm" });
+          objectUrl = URL.createObjectURL(blob);
+        }
+        setAudioBlobUrl(objectUrl);
+      } catch (e) {
+        console.error("[AudioBlobUrl] conversion error", e);
+        setAudioBlobUrl(null);
+      }
+    } else {
+      setAudioBlobUrl(null);
+    }
+
+    return () => {
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [decryptedBody, message?.type]);
 
   useEffect(() => {
     // Quick and hybrid messages auto-open (unless hybrid now requires manual key entry).
@@ -433,6 +473,7 @@ export function MessageDetail({ message, onDelete, onMarkViewed }: Props) {
               setRevealed={setRevealed}
               decryptedBody={decryptedBody}
               unlocked={unlocked}
+              audioBlobUrl={audioBlobUrl}
             />
           </>
         )}
@@ -620,12 +661,14 @@ function UnlockedBody({
   setRevealed,
   decryptedBody,
   unlocked,
+  audioBlobUrl,
 }: {
   message: SecureMessage;
   revealed: boolean;
   setRevealed: (v: boolean) => void;
   decryptedBody?: string | null;
   unlocked: boolean;
+  audioBlobUrl?: string | null;
 }) {
   if (message.stealth && !revealed) {
     return (
@@ -690,9 +733,23 @@ function UnlockedBody({
 
   return (
     <div className={`space-y-5 ${message.stealth ? "animate-blur-in" : "animate-fade-in"}`}>
-      {message.type === "voice" && (
-        <VoicePlayer audioSrc={unlocked ? decryptedBody || undefined : undefined} />
-      )}
+      {message.type === "voice" && unlocked && audioBlobUrl ? (
+        <div className="rounded-2xl border border-border bg-gradient-to-br from-surface to-surface-muted p-4 shadow-elegant space-y-3">
+          <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wider text-primary">
+            <span>🎙️</span> Encrypted voice note
+          </div>
+          <audio
+            controls
+            src={audioBlobUrl}
+            className="w-full rounded-xl"
+            style={{ height: "40px" }}
+            preload="auto"
+            autoPlay={false}
+          />
+        </div>
+      ) : message.type === "voice" ? (
+        <VoicePlayer />
+      ) : null}
       {message.type === "file" && (
         <div className="flex items-center justify-between rounded-2xl border border-border bg-surface-muted p-4">
           <div className="flex items-center gap-3">
@@ -712,7 +769,7 @@ function UnlockedBody({
           </button>
         </div>
       )}
-      {message.type !== "file" && (
+      {message.type !== "file" && message.type !== "voice" && (
         <p className="whitespace-pre-wrap text-[15px] leading-relaxed text-foreground">
           {unlocked ? decryptedBody || "[Message is empty]" : message.content}
         </p>

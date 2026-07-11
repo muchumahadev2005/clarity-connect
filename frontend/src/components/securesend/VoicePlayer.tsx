@@ -9,19 +9,61 @@ export function VoicePlayer({ duration = 32, audioSrc }: { duration?: number; au
   const timerRef = useRef<number | null>(null);
 
   useEffect(() => {
-    if (audioSrc && !audioRef.current) {
-      audioRef.current = new Audio(audioSrc);
-      audioRef.current.onended = () => {
+    let createdUrl: string | null = null;
+
+    // Clean up previous audio instance if it exists
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+    
+    setPlaying(false);
+    setProgress(0);
+    setCurrentTime(0);
+
+    if (audioSrc) {
+      let finalUrl = audioSrc;
+      if (audioSrc.startsWith("data:")) {
+        try {
+          const arr = audioSrc.split(",");
+          const mimeMatch = arr[0].match(/:(.*?);/);
+          const mime = mimeMatch ? mimeMatch[1] : "audio/webm";
+          const bstr = atob(arr[1]);
+          let n = bstr.length;
+          const u8arr = new Uint8Array(n);
+          while (n--) {
+            u8arr[n] = bstr.charCodeAt(n);
+          }
+          const blob = new Blob([u8arr], { type: mime });
+          createdUrl = URL.createObjectURL(blob);
+          finalUrl = createdUrl;
+        } catch (e) {
+          console.error("Failed to convert base64 to blob URL", e);
+        }
+      }
+
+      const audio = new Audio(finalUrl);
+      audio.onended = () => {
         setPlaying(false);
         setProgress(100);
       };
-      audioRef.current.ontimeupdate = () => {
-        if (audioRef.current) {
-          setCurrentTime(audioRef.current.currentTime);
-          setProgress((audioRef.current.currentTime / audioRef.current.duration) * 100);
+      audio.ontimeupdate = () => {
+        setCurrentTime(audio.currentTime);
+        if (audio.duration && !isNaN(audio.duration)) {
+          setProgress((audio.currentTime / audio.duration) * 100);
         }
       };
+      audioRef.current = audio;
     }
+
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
+      if (createdUrl) {
+        URL.revokeObjectURL(createdUrl);
+      }
+    };
   }, [audioSrc]);
 
   const togglePlay = () => {
