@@ -71,6 +71,8 @@ const allowedOrigins = [
   'https://clarity-connect.mahadevmuchu1.workers.dev',
   'https://securesend.co.in',
   'https://www.securesend.co.in',
+  'https://message.securesend.co.in',
+  'https://www.message.securesend.co.in',
 ];
 
 // Also allow any *.vercel.app, *.pages.dev, or *.workers.dev subdomain for preview deploys

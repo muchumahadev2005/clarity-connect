@@ -133,8 +133,24 @@ function Nav() {
 
 function LogoMark() {
   return (
-    <div className="relative grid h-8 w-8 place-items-center rounded-xl bg-linear-to-br from-primary to-key shadow-glow-primary">
-      <Shield className="h-4 w-4 text-primary-foreground" />
+    <div className="relative grid h-8 w-8 place-items-center rounded-xl bg-linear-to-br from-primary to-key shadow-glow-primary overflow-hidden">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" className="h-5 w-5 text-primary-foreground">
+        {/* Shield Outline */}
+        <path
+          d="M256 75 C325 75, 400 95, 400 115 C400 235, 370 355, 256 445 C142 355, 112 235, 112 115 C112 95, 187 75, 256 75 Z"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="32"
+          strokeLinejoin="round"
+        />
+        {/* Paper Plane */}
+        <g transform="translate(145, 150) scale(0.45)">
+          <path d="M500 100 L150 250 L280 320 Z" fill="currentColor" opacity="0.9" />
+          <path d="M500 100 L280 320 L320 400 Z" fill="currentColor" opacity="0.75" />
+          <path d="M500 100 L320 400 L420 310 Z" fill="currentColor" opacity="0.85" />
+          <path d="M280 320 L320 400 L260 360 Z" fill="currentColor" opacity="0.6" />
+        </g>
+      </svg>
     </div>
   );
 }
