@@ -34,6 +34,7 @@ import {
 } from "./crypto";
 import type { EncryptedPayload } from "./types";
 import { toast } from "sonner";
+import { VoicePlayer } from "./VoicePlayer";
 
 function generateSecretKey() {
   const hex = () =>
@@ -123,6 +124,19 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
   const audioChunksRef = useRef<Blob[]>([]);
   const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const audioUploadInputRef = useRef<HTMLInputElement | null>(null);
+  const [audioPreviewUrl, setAudioPreviewUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!audioBlob) {
+      setAudioPreviewUrl(null);
+      return;
+    }
+    const url = URL.createObjectURL(audioBlob);
+    setAudioPreviewUrl(url);
+    return () => {
+      URL.revokeObjectURL(url);
+    };
+  }, [audioBlob]);
 
   const isMp3File = (file: File) => {
     const lowerName = file.name.toLowerCase();
@@ -158,9 +172,10 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
   };
 
   const stopRecording = () => {
-    mediaRecorderRef.current?.stop();
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+      mediaRecorderRef.current.stop();
+    }
     setRecording(false);
-    setRecordingSecs(0);
     if (recordingTimerRef.current) {
       clearInterval(recordingTimerRef.current);
       recordingTimerRef.current = null;
@@ -186,7 +201,7 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
         audioChunksRef.current = [];
 
         recorder.ondataavailable = (e) => {
-          if (e.data.size > 0) audioChunksRef.current.push(e.data);
+          if (e.data && e.data.size > 0) audioChunksRef.current.push(e.data);
         };
 
         recorder.onstop = () => {
@@ -207,7 +222,7 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
           stream.getTracks().forEach((t) => t.stop());
         };
 
-        recorder.start();
+        recorder.start(100);
         setRecording(true);
         setRecordingSecs(0);
 
@@ -647,7 +662,7 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
         </div>
 
         {/* Body */}
-        <div className="flex-1 overflow-y-auto scrollbar-thin px-5 py-4 space-y-4">
+        <div className="flex-1 overflow-y-auto scrollbar-thin px-5 py-4 space-y-4 pb-48">
           {encStep > 0 && (
             <div className="animate-fade-in">
               <HybridSteps
@@ -669,26 +684,36 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
             />
           )}
           {tab === "voice" && (
-            <div className="flex flex-col items-center justify-center rounded-2xl border border-border bg-surface-muted py-10">
+            <div className="flex flex-col items-center justify-center rounded-2xl border border-border bg-surface-muted p-6">
               <button
                 type="button"
                 onClick={toggleRecording}
                 className={cn(
                   "flex h-16 w-16 items-center justify-center rounded-full text-primary-foreground transition shadow-elegant",
-                  recording ? "bg-destructive animate-pulse" : "bg-primary",
+                  recording ? "bg-destructive animate-pulse" : "bg-primary hover:scale-105",
                 )}
               >
                 {recording ? <Square className="h-6 w-6" /> : <Circle className="h-6 w-6" />}
               </button>
-              <p className="mt-3 text-sm text-muted-foreground">
+              <p className="mt-3 text-sm font-medium text-muted-foreground">
                 {recording
                   ? `Recording… ${MAX_RECORDING_SECS - recordingSecs}s remaining`
                   : audioBlob
                     ? audioFileName
                       ? `Selected: ${audioFileName}`
-                      : "Recording saved! Tap to re-record"
-                    : "Tap to record"}
+                      : "Voice note recorded! Tap button to re-record"
+                    : "Tap button to record voice note"}
               </p>
+
+              {audioBlob && !recording && (
+                <div className="mt-4 w-full max-w-sm">
+                  <VoicePlayer audioSrc={audioPreviewUrl} duration={recordingSecs || 10} />
+                  <p className="mt-2 text-center text-[11px] font-medium text-success">
+                    ✓ Ready to encrypt & send
+                  </p>
+                </div>
+              )}
+
               <div className="mt-4 flex items-center gap-2">
                 <button
                   type="button"
@@ -705,12 +730,7 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
                   onChange={handleMp3Upload}
                 />
               </div>
-              <p className="mt-2 text-[11px] text-muted-foreground">Only MP3 files are supported</p>
-              {audioBlob && !recording && (
-                <p className="mt-2 text-[10px] text-success font-medium">
-                  ✓ Ready to send securely
-                </p>
-              )}
+              <p className="mt-2 text-[11px] text-muted-foreground">Only MP3 files are supported for upload</p>
               {recording && (
                 <div className="mt-4 flex h-8 items-center gap-0.5">
                   {Array.from({ length: 28 }).map((_, i) => (
@@ -773,7 +793,12 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
               ).map((p) => (
                 <button
                   key={p.id}
-                  onClick={() => setProtection(p.id)}
+                  onClick={() => {
+                    setProtection(p.id);
+                    if (p.id === "hybrid") {
+                      setSendMode("direct");
+                    }
+                  }}
                   className={cn(
                     "flex flex-col items-center gap-1 rounded-xl border px-1.5 py-3 text-[11px] sm:text-xs transition text-center",
                     protection === p.id
@@ -789,51 +814,8 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
               ))}
             </div>
             {protection === "hybrid" && (
-              <div className="mt-3 space-y-3 animate-fade-in">
-                <div className="relative">
-                  <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                    Receiver
-                  </label>
-                  <input
-                    value={hybridReceiver}
-                    onChange={(e) => {
-                      setHybridReceiver(e.target.value);
-                      setShowSuggestions(true);
-                    }}
-                    onFocus={() => setShowSuggestions(true)}
-                    placeholder="Enter receiver email (public key will auto-load)"
-                    className="w-full rounded-xl border border-border bg-surface px-3.5 py-2.5 text-sm outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/15"
-                  />
-                  {showSuggestions && suggestions.length > 0 && (
-                    <>
-                      <div
-                        className="fixed inset-0 z-40 bg-transparent"
-                        onClick={() => setShowSuggestions(false)}
-                      />
-                      <div className="absolute z-50 mt-1 max-h-48 w-full overflow-y-auto rounded-xl border border-border bg-surface shadow-floating scrollbar-thin">
-                        {suggestions.map((s) => (
-                          <button
-                            key={s.email}
-                            type="button"
-                            onClick={() => {
-                              setHybridReceiver(s.email);
-                              setHybridReceiverPubKey(s.publicKey || "");
-                              setShowSuggestions(false);
-                            }}
-                            className="flex w-full items-center px-4 py-2.5 text-left text-xs hover:bg-secondary transition-colors"
-                          >
-                            <span className="font-medium text-foreground">{s.email}</span>
-                            {s.publicKey && (
-                              <span className="ml-auto rounded-full bg-primary-soft px-1.5 py-0.5 text-[9px] font-semibold text-primary">
-                                Key Found
-                              </span>
-                            )}
-                          </button>
-                        ))}
-                      </div>
-                    </>
-                  )}
-                </div>
+              <div className="mt-2.5 inline-flex items-center gap-1.5 rounded-full bg-primary-soft px-3 py-1 text-[11px] font-medium text-primary ring-1 ring-primary/20 animate-fade-in">
+                <ShieldCheck className="h-3.5 w-3.5" /> Uses receiver's RSA public key for hybrid encryption. Select receiver under Delivery below.
               </div>
             )}
             {protection === "key" && (
@@ -1030,7 +1012,7 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
               ))}
             </div>
 
-            {sendMode === "direct" && protection !== "hybrid" && (
+            {sendMode === "direct" && (
               <div className="mt-2 relative">
                 <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                   Receiver
@@ -1042,30 +1024,54 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
                     setShowSuggestions(true);
                   }}
                   onFocus={() => setShowSuggestions(true)}
-                  placeholder="Enter receiver email"
+                  placeholder="Search receiver email (e.g. type 'M')..."
                   className="w-full rounded-xl border border-border bg-surface px-3.5 py-2.5 text-sm outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/15"
                 />
-                {showSuggestions && suggestions.length > 0 && (
+                {showSuggestions && (
                   <>
                     <div
                       className="fixed inset-0 z-40 bg-transparent"
                       onClick={() => setShowSuggestions(false)}
                     />
-                    <div className="absolute z-50 mt-1 max-h-48 w-full overflow-y-auto rounded-xl border border-border bg-surface shadow-floating scrollbar-thin">
-                      {suggestions.map((s) => (
-                        <button
-                          key={s.email}
-                          type="button"
-                          onClick={() => {
-                            setHybridReceiver(s.email);
-                            setHybridReceiverPubKey(s.publicKey || "");
-                            setShowSuggestions(false);
-                          }}
-                          className="flex w-full items-center px-4 py-2.5 text-left text-xs hover:bg-secondary transition-colors"
-                        >
-                          <span className="font-medium text-foreground">{s.email}</span>
-                        </button>
-                      ))}
+                    <div className="absolute z-50 mt-1 max-h-52 w-full overflow-y-auto rounded-xl border border-border bg-surface shadow-floating scrollbar-thin p-1 animate-fade-in">
+                      {suggestions.length > 0 ? (
+                        suggestions.map((s) => (
+                          <button
+                            key={s.email}
+                            type="button"
+                            onClick={() => {
+                              setHybridReceiver(s.email);
+                              setHybridReceiverPubKey(s.publicKey || "");
+                              setShowSuggestions(false);
+                            }}
+                            className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-xs hover:bg-primary-soft/50 transition-colors"
+                          >
+                            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground font-semibold uppercase text-[11px]">
+                              {s.email[0]}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="font-medium text-foreground truncate">{s.email}</p>
+                            </div>
+                            {s.publicKey ? (
+                              <span className="shrink-0 rounded-full bg-success/10 px-2 py-0.5 text-[10px] font-semibold text-success border border-success/20">
+                                🔑 Key Active
+                              </span>
+                            ) : (
+                              <span className="shrink-0 rounded-full bg-secondary px-2 py-0.5 text-[10px] text-muted-foreground">
+                                🔓 User
+                              </span>
+                            )}
+                          </button>
+                        ))
+                      ) : hybridReceiver.trim() ? (
+                        <div className="px-3 py-3 text-center text-xs text-muted-foreground">
+                          No matching users found for "{hybridReceiver.trim()}"
+                        </div>
+                      ) : (
+                        <div className="px-3 py-3 text-center text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                          Type email to search users...
+                        </div>
+                      )}
                     </div>
                   </>
                 )}

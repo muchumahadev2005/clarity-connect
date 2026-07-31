@@ -1,6 +1,10 @@
-const { Resend } = require('resend');
-
-const resend = new Resend(process.env.RESEND_API_KEY);
+let resendClient;
+const getResendClient = () => {
+  if (!resendClient) {
+    resendClient = new Resend(process.env.RESEND_API_KEY || 're_dummy_key');
+  }
+  return resendClient;
+};
 
 const isPlainObject = (value) =>
   Boolean(value) && typeof value === 'object' && (value.constructor === Object || Object.getPrototypeOf(value) === null);
@@ -56,7 +60,7 @@ exports.sendEmailViaResend = async ({ to, subject, message }) => {
       messageLength: safeMessage.length,
     });
 
-    const result = await resend.emails.send({
+    const result = await getResendClient().emails.send({
       from,
       to: safeTo,
       subject: safeSubject,

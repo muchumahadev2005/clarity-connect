@@ -133,6 +133,24 @@ export function Sidebar({ active, onSelect, onCompose, counts, collapsed, onTogg
               </button>
             );
           })}
+
+          <Link
+            to="/anonymous"
+            onClick={() => {
+              if (window.innerWidth < 1024) onToggle();
+            }}
+            className={cn(
+              "flex items-center gap-4 rounded-r-full pl-6 pr-4 py-2 text-sm transition-colors text-foreground/80 hover:bg-anon-soft hover:text-anon mt-1",
+              collapsed &&
+                "lg:justify-center lg:pl-0 lg:pr-0 lg:py-3 lg:rounded-full lg:mx-auto lg:w-12",
+            )}
+            aria-label="Anonymous messaging"
+          >
+            <VenetianMask className="h-5 w-5 shrink-0 text-anon" />
+            {(!collapsed || (collapsed && window.innerWidth < 1024)) && (
+              <span className="flex-1 text-left">Anonymous 🎭</span>
+            )}
+          </Link>
         </nav>
 
         {(!collapsed || (collapsed && window.innerWidth < 1024)) && (
@@ -167,23 +185,6 @@ export function Sidebar({ active, onSelect, onCompose, counts, collapsed, onTogg
             </div>
           )}
 
-          <Link
-            to="/anonymous"
-            onClick={() => {
-              if (window.innerWidth < 1024) onToggle();
-            }}
-            className={cn(
-              "flex items-center gap-4 rounded-r-full pl-6 pr-4 py-2 text-sm transition-colors text-foreground/80 hover:bg-anon-soft hover:text-anon",
-              collapsed &&
-                "lg:justify-center lg:pl-0 lg:pr-0 lg:py-3 lg:rounded-full lg:mx-auto lg:w-12",
-            )}
-            aria-label="Anonymous messaging"
-          >
-            <VenetianMask className="h-5 w-5 shrink-0 text-anon" />
-            {(!collapsed || (collapsed && window.innerWidth < 1024)) && (
-              <span className="flex-1 text-left">Anonymous 🎭</span>
-            )}
-          </Link>
           <button
             onClick={handleLogout}
             className={cn(

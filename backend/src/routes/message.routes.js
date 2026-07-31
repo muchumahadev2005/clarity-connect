@@ -10,6 +10,7 @@ router.get('/inbox', [authMiddleware, generalApiLimiter], messageController.getI
 router.get('/outbox', [authMiddleware, generalApiLimiter], messageController.getOutbox);
 router.get('/:id', publicMessageLimiter, messageController.getMessageById); // Public GET for shared links
 router.post('/:id/view', publicMessageLimiter, messageController.markViewed); // Public for shared links
+router.delete('/expired', [authMiddleware, generalApiLimiter], messageController.purgeExpiredMessages);
 router.delete('/:id', [authMiddleware, generalApiLimiter], messageController.deleteMessage);
 
 module.exports = router;

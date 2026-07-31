@@ -733,22 +733,23 @@ function UnlockedBody({
 
   return (
     <div className={`space-y-5 ${message.stealth ? "animate-blur-in" : "animate-fade-in"}`}>
-      {message.type === "voice" && unlocked && audioBlobUrl ? (
-        <div className="rounded-2xl border border-border bg-gradient-to-br from-surface to-surface-muted p-4 shadow-elegant space-y-3">
-          <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wider text-primary">
-            <span>🎙️</span> Encrypted voice note
-          </div>
-          <audio
-            controls
-            src={audioBlobUrl}
-            className="w-full rounded-xl"
-            style={{ height: "40px" }}
-            preload="auto"
-            autoPlay={false}
-          />
+      {message.type === "voice" && unlocked ? (
+        <div className="space-y-3">
+          <VoicePlayer audioSrc={audioBlobUrl || decryptedBody} />
+          {(audioBlobUrl || (decryptedBody && decryptedBody.startsWith("data:"))) && (
+            <div className="rounded-xl border border-border bg-surface p-2 shadow-sm">
+              <audio
+                controls
+                src={audioBlobUrl || decryptedBody || undefined}
+                className="w-full rounded-lg"
+                style={{ height: "36px" }}
+                preload="auto"
+              />
+            </div>
+          )}
         </div>
       ) : message.type === "voice" ? (
-        <VoicePlayer />
+        <VoicePlayer audioSrc={null} />
       ) : null}
       {message.type === "file" && (
         <div className="flex items-center justify-between rounded-2xl border border-border bg-surface-muted p-4">

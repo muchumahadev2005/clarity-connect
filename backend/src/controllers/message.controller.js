@@ -378,3 +378,17 @@ exports.getMessageById = async (req, res, next) => {
     next(err);
   }
 };
+
+exports.purgeExpiredMessages = async (req, res, next) => {
+  try {
+    const { cleanupExpiredMessages } = require('../services/cleanup.service');
+    const result = await cleanupExpiredMessages();
+    res.status(200).json({
+      success: true,
+      message: `Monthly cleanup completed. Purged ${result.count} expired messages.`,
+      data: result
+    });
+  } catch (err) {
+    next(err);
+  }
+};
