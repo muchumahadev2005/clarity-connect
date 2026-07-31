@@ -26,6 +26,7 @@ import {
   hybridDecrypt,
   getPrivateKeyStatus,
   unlockStoredRSAKeyPair,
+  loadOrCreateRSAKeyPair,
   normalizeSecretKey,
   symmetricDecrypt,
 } from "./crypto";
@@ -138,24 +139,27 @@ export function MessageDetail({ message, onDelete, onMarkViewed }: Props) {
     // Check RSA vault status for hybrid messages.
     if (message?.protection === "hybrid") {
       const status = getPrivateKeyStatus();
-      if (status === "locked" || status === "legacy") {
-        unlockStoredRSAKeyPair("securesend_default")
-          .then(() => {
-            setDeviceKeyStatus("unlocked");
+      if (status === "unlocked") {
+        setDeviceKeyStatus("unlocked");
+      } else {
+        loadOrCreateRSAKeyPair()
+          .then((res) => {
+            if (res.privateKey) {
+              setDeviceKeyStatus("unlocked");
+            } else {
+              setDeviceKeyStatus("locked");
+            }
           })
           .catch(() => {
             setDeviceKeyStatus(status);
           });
-      } else {
-        setDeviceKeyStatus(status);
       }
     } else {
       setDeviceKeyStatus("none");
     }
   }, [message?.id, message?.content, message?.encrypted, message?.protection]);
 
-  // Auto-trigger quick messages decryption
-  // Auto-trigger quick messages decryption
+  // Auto-trigger quick and hybrid message decryption
   useEffect(() => {
     if (!message || !message.encrypted || unlocked || decrypting || decryptStep !== 0 || decryptionError) return;
 
@@ -163,6 +167,8 @@ export function MessageDetail({ message, onDelete, onMarkViewed }: Props) {
       if (pwd) {
         handleUnlock();
       }
+    } else if (message.protection === "hybrid") {
+      handleUnlock();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [message?.id, unlocked, pwd, decrypting, decryptStep, decryptionError]);
@@ -194,7 +200,7 @@ export function MessageDetail({ message, onDelete, onMarkViewed }: Props) {
     if (decrypting) return;
     
     if (message.protection === "hybrid") {
-      if (deviceKeyStatus !== "unlocked" && !privateKeyPassphrase.trim()) {
+      if (deviceKeyStatus === "locked" && !privateKeyPassphrase.trim()) {
         toast.error("Enter your device passphrase");
         return;
       }
@@ -208,7 +214,7 @@ export function MessageDetail({ message, onDelete, onMarkViewed }: Props) {
         await new Promise((r) => setTimeout(r, 600)); // Pause to show step 1
         setDecryptStep(2);
 
-        let plaintext: string;
+        let plaintext = "";
         const isSymmetricQuick = message.protection === "quick" && message.encrypted.encryptedAESKey === "symmetric";
         if (
           message.protection === "key" ||
@@ -234,24 +240,47 @@ export function MessageDetail({ message, onDelete, onMarkViewed }: Props) {
           });
         } else {
           // Hybrid mode
-          let privateKey: CryptoKey;
+          let privateKey: CryptoKey | null = null;
           try {
             const pwdToTry = privateKeyPassphrase.trim() || "securesend_default";
-            privateKey = (await unlockStoredRSAKeyPair(pwdToTry)).privateKey;
+            const keyRes = await loadOrCreateRSAKeyPair();
+            if (keyRes.privateKey) {
+              privateKey = keyRes.privateKey;
+            } else {
+              privateKey = (await unlockStoredRSAKeyPair(pwdToTry)).privateKey;
+            }
             setDeviceKeyStatus("unlocked");
           } catch (unlockErr: unknown) {
             console.error("Auto/Manual private key unlock failed", unlockErr);
-            const errObj = unlockErr as { message?: string };
-            throw new Error(
-              errObj?.message === "Incorrect passphrase."
-                ? "Incorrect device passphrase. Please check and try again."
-                : errObj?.message || "Private key verification failed.",
-            );
+            if (message.folder !== "sent") {
+              setDeviceKeyStatus("locked");
+              const errObj = unlockErr as { message?: string };
+              throw new Error(
+                errObj?.message === "Incorrect passphrase."
+                  ? "Incorrect device passphrase. Please check and try again."
+                  : "Your device RSA key is locked or missing. Please enter your device passphrase.",
+              );
+            }
           }
-          plaintext = await hybridDecrypt(message.encrypted, privateKey, (aes, rsa) => {
-            setAesKeyPreview(aes);
-            setRsaWrappedKeyPreview(rsa);
-          });
+
+          if (privateKey) {
+            try {
+              plaintext = await hybridDecrypt(message.encrypted, privateKey, (aes, rsa) => {
+                setAesKeyPreview(aes);
+                setRsaWrappedKeyPreview(rsa);
+              });
+            } catch (decErr) {
+              if (message.folder === "sent") {
+                plaintext = message.content || "Encrypted Message";
+              } else {
+                throw decErr;
+              }
+            }
+          } else if (message.folder === "sent") {
+            plaintext = message.content || "Encrypted Message";
+          } else {
+            throw new Error("Unable to decrypt hybrid payload.");
+          }
         }
 
         await new Promise((r) => setTimeout(r, 2000)); // Pause to show AES preview
@@ -400,35 +429,48 @@ export function MessageDetail({ message, onDelete, onMarkViewed }: Props) {
                   </p>
                 </div>
               )
-            ) : message.protection === "hybrid" && deviceKeyStatus !== "unlocked" ? (
-              <div className="mx-auto mt-6 max-w-md animate-fade-in bg-surface p-5 border border-primary/20 rounded-2xl shadow-floating">
-                <div className="flex items-center gap-2 mb-3 text-primary">
-                  <KeyRound className="h-5 w-5" />
-                  <h4 className="font-semibold">Decrypt Hybrid Message</h4>
+            ) : message.protection === "hybrid" ? (
+              deviceKeyStatus === "locked" || (decryptionError && !unlocked) ? (
+                <div className="mx-auto mt-6 max-w-md animate-fade-in bg-surface p-5 border border-primary/20 rounded-2xl shadow-floating">
+                  <div className="flex items-center gap-2 mb-3 text-primary">
+                    <KeyRound className="h-5 w-5" />
+                    <h4 className="font-semibold">Decrypt Hybrid Message</h4>
+                  </div>
+                  <p className="text-xs text-muted-foreground mb-4">
+                    Enter your device passphrase to unlock the encrypted private key that protects this message.
+                  </p>
+                  <input
+                    value={privateKeyPassphrase}
+                    onChange={(e) => setPrivateKeyPassphrase(e.target.value)}
+                    placeholder="Enter your device passphrase"
+                    type="password"
+                    className="w-full rounded-xl border border-border bg-surface-muted px-4 py-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 mb-4"
+                    spellCheck={false}
+                    onKeyDown={(e) => e.key === "Enter" && handleUnlock()}
+                  />
+                  <button
+                    onClick={handleUnlock}
+                    disabled={!privateKeyPassphrase.trim() || decrypting}
+                    className="w-full inline-flex justify-center items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground shadow-elegant hover:opacity-90 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                  >
+                    <Unlock className="h-4 w-4" />
+                    {decrypting ? "Decrypting..." : "Decrypt AES Key & Message"}
+                  </button>
+                  {decryptionError && (
+                    <p className="mt-2 text-center text-xs font-medium text-destructive">
+                      {decryptionError}
+                    </p>
+                  )}
                 </div>
-                <p className="text-xs text-muted-foreground mb-4">
-                  Enter your device passphrase to unlock the encrypted private key that protects this message.
-                </p>
-                <input
-                  value={privateKeyPassphrase}
-                  onChange={(e) => setPrivateKeyPassphrase(e.target.value)}
-                  placeholder="Enter your device passphrase"
-                  type="password"
-                  className="w-full rounded-xl border border-border bg-surface-muted px-4 py-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 mb-4"
-                  spellCheck={false}
-                  onKeyDown={(e) => e.key === "Enter" && handleUnlock()}
-                />
-                <button
-                  onClick={handleUnlock}
-                  disabled={
-                    !privateKeyPassphrase.trim() || decrypting
-                  }
-                  className="w-full inline-flex justify-center items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground shadow-elegant hover:opacity-90 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed transition"
-                >
-                  <Unlock className="h-4 w-4" />
-                  {decrypting ? "Decrypting..." : "Decrypt AES Key & Message"}
-                </button>
-              </div>
+              ) : (
+                <div className="mx-auto mt-6 max-w-md animate-fade-in bg-surface p-6 border border-primary/20 rounded-2xl shadow-floating text-center">
+                  <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary mb-3" />
+                  <h4 className="font-semibold text-sm text-foreground">Decrypting Hybrid message automatically…</h4>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Unwrapping the AES key using your device's RSA private key.
+                  </p>
+                </div>
+              )
             ) : (
               <LockScreen
                 mode={message.protection as "password" | "key" | "quick"}

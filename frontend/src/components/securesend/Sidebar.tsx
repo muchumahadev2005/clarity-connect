@@ -8,8 +8,9 @@ import {
   Menu,
   VenetianMask,
   LogOut,
+  X,
 } from "lucide-react";
-import { Link, useNavigate } from "@tanstack/react-router";
+import { Link } from "@tanstack/react-router";
 import type { Folder } from "./types";
 import { cn } from "@/lib/utils";
 import { clearStoredRSAKeys } from "./crypto";
@@ -32,8 +33,6 @@ interface Props {
 }
 
 export function Sidebar({ active, onSelect, onCompose, counts, collapsed, onToggle, user }: Props) {
-  const navigate = useNavigate();
-
   const handleLogout = () => {
     localStorage.removeItem("isLoggedIn");
     localStorage.removeItem("token");
@@ -41,92 +40,124 @@ export function Sidebar({ active, onSelect, onCompose, counts, collapsed, onTogg
     window.location.href = "/landing";
   };
 
+  const handleSelect = (f: Folder) => {
+    onSelect(f);
+    if (!collapsed && typeof window !== "undefined" && window.innerWidth < 1024) {
+      onToggle();
+    }
+  };
+
+  const handleCompose = () => {
+    onCompose();
+    if (!collapsed && typeof window !== "undefined" && window.innerWidth < 1024) {
+      onToggle();
+    }
+  };
+
   return (
     <>
-      {/* Mobile Overlay Backdrop */}
-      <div
-        className={cn(
-          "fixed inset-0 z-40 bg-black/50 backdrop-blur-sm transition-opacity lg:hidden",
-          collapsed ? "pointer-events-none opacity-0" : "opacity-100",
-        )}
-        onClick={onToggle}
-      />
+      {/* Mobile Gmail Backdrop Overlay (Only visible when drawer is expanded on mobile) */}
+      {!collapsed && (
+        <div
+          className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm transition-opacity lg:hidden"
+          onClick={onToggle}
+        />
+      )}
 
       <aside
         className={cn(
-          "flex flex-col border-r border-border bg-surface transition-all duration-300 ease-in-out z-50",
-          "fixed inset-y-0 left-0 lg:static",
-          collapsed ? "-translate-x-full lg:translate-x-0 lg:w-18" : "translate-x-0 w-70",
+          "flex flex-col border-r border-border bg-surface transition-all duration-300 ease-in-out shrink-0 select-none h-full",
+          // Mobile: floating overlay drawer when expanded (z-50), narrow in-line rail when collapsed
+          // Desktop (lg:): in-line sidebar (w-18 when collapsed, w-64 when expanded)
+          !collapsed
+            ? "fixed inset-y-0 left-0 z-50 w-72 shadow-2xl lg:static lg:w-64 lg:shadow-none"
+            : "w-16 sm:w-18 z-30",
         )}
       >
-        <div className="flex items-center gap-2 px-4 py-4">
-          <button
-            onClick={onToggle}
-            className="rounded-full p-2 hover:bg-secondary transition-colors"
-            aria-label="Toggle sidebar"
-          >
-            <Menu className="h-5 w-5 text-muted-foreground" />
-          </button>
-          {(!collapsed ||
-            (collapsed && typeof window !== "undefined" && window.innerWidth < 1024)) && (
-            <Link
-              to="/"
-              className="flex items-center gap-2 animate-in fade-in slide-in-from-left-2 hover:opacity-90 transition-opacity"
+        {/* Top Bar: Hamburger + Title */}
+        <div
+          className={cn(
+            "flex items-center py-3.5 border-b border-border/40",
+            collapsed ? "justify-center" : "justify-between px-4",
+          )}
+        >
+          <div className="flex items-center gap-2">
+            <button
+              onClick={onToggle}
+              className="rounded-full p-2 hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground"
+              aria-label="Toggle sidebar"
+              title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
             >
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-                <ShieldCheck className="h-5 w-5" />
-              </div>
-              <span className="text-lg font-semibold tracking-tight">SecureSend</span>
-            </Link>
+              <Menu className="h-5 w-5" />
+            </button>
+            {!collapsed && (
+              <Link
+                to="/"
+                className="flex items-center gap-2 animate-in fade-in slide-in-from-left-2 hover:opacity-90 transition-opacity"
+              >
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm">
+                  <ShieldCheck className="h-5 w-5" />
+                </div>
+                <span className="text-lg font-semibold tracking-tight">SecureSend</span>
+              </Link>
+            )}
+          </div>
+          {!collapsed && (
+            <button
+              onClick={onToggle}
+              className="rounded-full p-1.5 hover:bg-secondary text-muted-foreground lg:hidden"
+              aria-label="Close sidebar"
+            >
+              <X className="h-5 w-5" />
+            </button>
           )}
         </div>
 
-        <div className={cn("px-3 pb-3", collapsed && "lg:px-2")}>
+        {/* New Secure Message Action */}
+        <div className="p-2.5">
           <button
-            onClick={() => {
-              onCompose();
-              if (window.innerWidth < 1024) onToggle();
-            }}
+            onClick={handleCompose}
             className={cn(
               "group flex items-center gap-3 rounded-2xl bg-primary-soft text-accent-foreground font-medium shadow-elegant hover:shadow-floating transition-all",
-              collapsed ? "lg:h-12 lg:w-12 lg:justify-center h-14 w-full px-4" : "h-14 w-full px-4",
+              collapsed ? "h-11 w-11 justify-center mx-auto" : "h-12 w-full px-4",
             )}
             aria-label="New secure message"
+            title={collapsed ? "New Secure Message" : undefined}
           >
             <Plus className="h-5 w-5 shrink-0" />
-            {(!collapsed || (collapsed && window.innerWidth < 1024)) && (
-              <span>New Secure Message</span>
-            )}
+            {!collapsed && <span className="font-semibold text-sm">New Secure Message</span>}
           </button>
         </div>
 
-        <nav className="flex-1 px-2 py-2 space-y-0.5">
+        {/* Navigation List */}
+        <nav className="flex-1 px-2 py-2 space-y-1 overflow-y-auto">
           {items.map((it) => {
             const Icon = it.icon;
             const isActive = active === it.key;
             return (
               <button
                 key={it.key}
-                onClick={() => {
-                  onSelect(it.key);
-                  if (window.innerWidth < 1024) onToggle();
-                }}
+                onClick={() => handleSelect(it.key)}
                 className={cn(
-                  "flex w-full items-center gap-4 rounded-r-full pl-6 pr-4 py-2 text-sm transition-colors",
-                  collapsed &&
-                    "lg:justify-center lg:pl-0 lg:pr-0 lg:py-3 lg:rounded-full lg:mx-auto lg:w-12",
+                  "flex items-center text-sm transition-all",
+                  collapsed
+                    ? "h-11 w-11 justify-center mx-auto rounded-2xl"
+                    : "w-full gap-4 rounded-r-full pl-5 pr-4 py-2.5",
                   isActive
-                    ? "bg-primary-soft text-accent-foreground font-semibold"
+                    ? "bg-primary-soft text-accent-foreground font-bold shadow-sm"
                     : "text-foreground/80 hover:bg-secondary",
                 )}
                 aria-label={it.label}
+                title={collapsed ? `${it.label} (${counts[it.key] || 0})` : undefined}
               >
                 <Icon className="h-5 w-5 shrink-0" />
-                {(!collapsed || (collapsed && window.innerWidth < 1024)) && (
+                {!collapsed && (
                   <>
                     <span className="flex-1 text-left">{it.label}</span>
                     {counts[it.key] > 0 && (
-                      <span className="text-xs font-medium tabular-nums">{counts[it.key]}</span>
+                      <span className="text-xs font-semibold tabular-nums px-2 py-0.5 rounded-full bg-surface/50">
+                        {counts[it.key]}
+                      </span>
                     )}
                   </>
                 )}
@@ -137,46 +168,56 @@ export function Sidebar({ active, onSelect, onCompose, counts, collapsed, onTogg
           <Link
             to="/anonymous"
             onClick={() => {
-              if (window.innerWidth < 1024) onToggle();
+              if (!collapsed && typeof window !== "undefined" && window.innerWidth < 1024) {
+                onToggle();
+              }
             }}
             className={cn(
-              "flex items-center gap-4 rounded-r-full pl-6 pr-4 py-2 text-sm transition-colors text-foreground/80 hover:bg-anon-soft hover:text-anon mt-1",
-              collapsed &&
-                "lg:justify-center lg:pl-0 lg:pr-0 lg:py-3 lg:rounded-full lg:mx-auto lg:w-12",
+              "flex items-center text-sm transition-all text-foreground/80 hover:bg-anon-soft hover:text-anon mt-2",
+              collapsed
+                ? "h-11 w-11 justify-center mx-auto rounded-2xl"
+                : "w-full gap-4 rounded-r-full pl-5 pr-4 py-2.5",
             )}
             aria-label="Anonymous messaging"
+            title={collapsed ? "Anonymous 🎭" : undefined}
           >
             <VenetianMask className="h-5 w-5 shrink-0 text-anon" />
-            {(!collapsed || (collapsed && window.innerWidth < 1024)) && (
-              <span className="flex-1 text-left">Anonymous 🎭</span>
-            )}
+            {!collapsed && <span className="flex-1 text-left font-medium">Anonymous 🎭</span>}
           </Link>
         </nav>
 
-        {(!collapsed || (collapsed && window.innerWidth < 1024)) && (
-          <div className="m-3 rounded-xl border border-border bg-surface-muted p-3 text-xs text-muted-foreground animate-in fade-in duration-500">
+        {/* Security Banner (Expanded mode only) */}
+        {!collapsed && (
+          <div className="m-3 rounded-xl border border-border bg-surface-muted p-3 text-xs text-muted-foreground animate-in fade-in duration-300">
             <div className="flex items-center gap-2 font-semibold text-foreground">
               <ShieldCheck className="h-4 w-4 text-success" />
               End-to-end encrypted
             </div>
-            <p className="mt-1 leading-relaxed">
+            <p className="mt-1 leading-relaxed text-[11px]">
               Messages are encrypted on your device. We never see the contents.
             </p>
           </div>
         )}
 
-        <div className={cn("border-t border-border px-2 py-2", collapsed && "lg:px-1")}>
+        {/* Footer Profile & Logout */}
+        <div
+          className={cn(
+            "border-t border-border p-2 space-y-1.5",
+            collapsed && "flex flex-col items-center gap-2 px-1 py-3",
+          )}
+        >
           {user && (
             <div
               className={cn(
-                "mb-2 flex items-center gap-3 rounded-xl px-4 py-3 transition-colors",
-                collapsed ? "lg:justify-center lg:px-0" : "",
+                "flex items-center gap-3 rounded-xl transition-colors",
+                collapsed ? "justify-center" : "px-3 py-2",
               )}
+              title={collapsed ? `${user.email} (Logged in)` : undefined}
             >
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary-soft text-primary font-bold text-xs">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary-soft text-primary font-bold text-xs shadow-sm">
                 {user.email.charAt(0).toUpperCase()}
               </div>
-              {(!collapsed || (collapsed && window.innerWidth < 1024)) && (
+              {!collapsed && (
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-xs font-semibold text-foreground">{user.email}</p>
                   <p className="text-[10px] text-muted-foreground">Logged in</p>
@@ -188,16 +229,16 @@ export function Sidebar({ active, onSelect, onCompose, counts, collapsed, onTogg
           <button
             onClick={handleLogout}
             className={cn(
-              "flex w-full items-center gap-4 rounded-r-full pl-6 pr-4 py-2 text-sm transition-colors text-foreground/80 hover:bg-destructive/10 hover:text-destructive mt-1",
-              collapsed &&
-                "lg:justify-center lg:pl-0 lg:pr-0 lg:py-3 lg:rounded-full lg:mx-auto lg:w-12",
+              "flex items-center text-sm transition-colors text-foreground/80 hover:bg-destructive/10 hover:text-destructive",
+              collapsed
+                ? "h-10 w-10 justify-center mx-auto rounded-xl"
+                : "w-full gap-4 rounded-r-full pl-5 pr-4 py-2",
             )}
             aria-label="Log out"
+            title={collapsed ? "Log out" : undefined}
           >
             <LogOut className="h-5 w-5 shrink-0" />
-            {(!collapsed || (collapsed && window.innerWidth < 1024)) && (
-              <span className="flex-1 text-left">Log out</span>
-            )}
+            {!collapsed && <span className="flex-1 text-left">Log out</span>}
           </button>
         </div>
       </aside>

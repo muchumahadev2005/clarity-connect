@@ -251,6 +251,19 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
   const [keyCopied, setKeyCopied] = useState(false);
   const [keyPulse, setKeyPulse] = useState(false);
   const keyInputRef = useRef<HTMLInputElement | null>(null);
+  const deliverySectionRef = useRef<HTMLDivElement | null>(null);
+  const receiverInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Auto-scroll Delivery & Receiver section into view when Send Directly is selected
+  useEffect(() => {
+    if (sendMode === "direct") {
+      const timer = setTimeout(() => {
+        deliverySectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [sendMode, protection]);
+
   // Hybrid mode state
   const [hybridReceiver, setHybridReceiver] = useState("");
   const [hybridReceiverPubKey, setHybridReceiverPubKey] = useState("");
@@ -975,7 +988,7 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
           </label>
 
           {/* Send mode */}
-          <div>
+          <div ref={deliverySectionRef} className="scroll-mt-4">
             <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               Delivery
             </p>
@@ -1013,11 +1026,12 @@ export function ComposeModal({ open, onClose, onEncrypt }: Props) {
             </div>
 
             {sendMode === "direct" && (
-              <div className="mt-2 relative">
+              <div className="mt-3 relative animate-fade-in">
                 <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                   Receiver
                 </label>
                 <input
+                  ref={receiverInputRef}
                   value={hybridReceiver}
                   onChange={(e) => {
                     setHybridReceiver(e.target.value);
