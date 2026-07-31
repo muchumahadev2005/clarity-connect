@@ -8,7 +8,7 @@ import {
   type ClipboardEvent,
 } from "react";
 import { Toaster, toast } from "sonner";
-import { ShieldCheck, Mail, KeyRound, Loader2, CheckCircle2, ArrowLeft, Timer } from "lucide-react";
+import { ShieldCheck, Mail, KeyRound, Loader2, CheckCircle2, ArrowLeft, Timer, Circle, Eye, EyeOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 import api from "@/lib/api";
 
@@ -47,6 +47,8 @@ function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [verifying, setVerifying] = useState(false);
   const [otp, setOtp] = useState<string[]>(["", "", "", "", "", ""]);
@@ -55,6 +57,32 @@ function LoginPage() {
   const inputsRef = useRef<Array<HTMLInputElement | null>>([]);
 
   const emailValid = useMemo(() => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()), [email]);
+
+  const passwordChecks = useMemo(
+    () => ({
+      minLength: password.length >= 12,
+      uppercase: /[A-Z]/.test(password),
+      lowercase: /[a-z]/.test(password),
+      number: /[0-9]/.test(password),
+      symbol: /[@#$%]/.test(password),
+    }),
+    [password],
+  );
+
+  const missingPasswordRules = useMemo(() => {
+    const missing: string[] = [];
+    if (!passwordChecks.minLength) missing.push("Minimum 12 characters");
+    if (!passwordChecks.uppercase) missing.push("Uppercase letter (A-Z)");
+    if (!passwordChecks.lowercase) missing.push("Lowercase letter (a-z)");
+    if (!passwordChecks.number) missing.push("Number (0-9)");
+    if (!passwordChecks.symbol) missing.push("Symbol (@ # $ %)");
+    return missing;
+  }, [passwordChecks]);
+
+  const passwordStrong = missingPasswordRules.length === 0;
+  const passwordMatch = password === confirmPassword;
+  const canResetPassword =
+    passwordStrong && passwordMatch && password.length > 0 && confirmPassword.length > 0;
 
   useEffect(() => {
     if (resendIn <= 0) return;
@@ -126,6 +154,22 @@ function LoginPage() {
     }
   };
 
+  const handleResend = async () => {
+    if (resendIn > 0) return;
+    try {
+      await api.post("/auth/forgot-password", { email: email.trim() });
+      setOtp(["", "", "", "", "", ""]);
+      setError(null);
+      setResendIn(30);
+      toast.success("New reset code sent");
+    } catch (err: unknown) {
+      toast.error(
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+          "Failed to resend reset code",
+      );
+    }
+  };
+
   const handleOtpChange = (idx: number, value: string) => {
     const v = value.replace(/\D/g, "").slice(-1);
     setOtp((prev) => {
@@ -177,11 +221,11 @@ function LoginPage() {
   };
 
   const handleResetPassword = async () => {
-    if (password.length < 6) {
-      setError("Password must be at least 6 characters.");
+    if (!passwordStrong) {
+      setError(`Password is missing: ${missingPasswordRules.join(", ")}.`);
       return;
     }
-    if (password !== confirmPassword) {
+    if (!passwordMatch) {
       setError("Passwords do not match.");
       return;
     }
@@ -406,9 +450,12 @@ function LoginPage() {
                 <ArrowLeft className="h-3.5 w-3.5" /> Change email
               </button>
               <div className="mb-6 text-center">
+                <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                  <KeyRound className="h-6 w-6" />
+                </div>
                 <h1 className="text-2xl font-semibold tracking-tight">Verify Reset Code</h1>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  We sent a code to{" "}
+                  We sent a 6-digit code to{" "}
                   <span className="font-medium text-foreground">{maskEmail(email)}</span>
                 </p>
               </div>
@@ -429,9 +476,9 @@ function LoginPage() {
                     onChange={(e) => handleOtpChange(i, e.target.value)}
                     onKeyDown={(e) => handleOtpKey(i, e)}
                     className={cn(
-                      "w-full aspect-square rounded-xl border bg-background text-center text-base sm:text-lg font-semibold outline-none transition-all flex items-center justify-center min-h-[40px]",
+                      "w-full aspect-square rounded-xl border bg-background text-center text-base sm:text-lg font-semibold outline-none transition-all flex items-center justify-center min-h-[40px] focus:scale-105",
                       "focus:ring-2 focus:ring-primary/30 focus:border-primary",
-                      error ? "border-destructive" : d ? "border-primary" : "border-border",
+                      error ? "border-destructive focus:ring-destructive/30 focus:border-destructive" : d ? "border-primary" : "border-border",
                     )}
                   />
                 ))}
@@ -443,47 +490,183 @@ function LoginPage() {
               <button
                 onClick={handleVerifyOtp}
                 disabled={verifying || otp.join("").length < 6}
-                className="mt-6 w-full rounded-xl bg-primary px-4 py-3 text-sm font-medium text-primary-foreground shadow-elegant transition-all hover:opacity-90 disabled:opacity-60"
+                className={cn(
+                  "mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-medium text-primary-foreground shadow-elegant transition-all",
+                  "hover:opacity-90 hover:-translate-y-0.5 active:translate-y-0",
+                  "disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:translate-y-0",
+                )}
               >
-                {verifying ? <Loader2 className="mx-auto h-4 w-4 animate-spin" /> : "Verify Code"}
+                {verifying ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Verifying...
+                  </>
+                ) : (
+                  "Verify Code"
+                )}
               </button>
+
+              <div className="mt-5 flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
+                <span>Didn't receive code?</span>
+                {resendIn > 0 ? (
+                  <span className="inline-flex items-center gap-1 font-medium text-foreground/70">
+                    <Timer className="h-3.5 w-3.5" />
+                    Resend in {resendIn}s
+                  </span>
+                ) : (
+                  <button
+                    onClick={handleResend}
+                    className="font-medium text-primary hover:underline"
+                  >
+                    Resend Reset Code
+                  </button>
+                )}
+              </div>
             </>
           )}
 
           {step === "forgot-reset" && (
             <>
               <div className="mb-6 text-center">
+                <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                  <KeyRound className="h-6 w-6" />
+                </div>
                 <h1 className="text-2xl font-semibold tracking-tight">New password</h1>
                 <p className="mt-1 text-sm text-muted-foreground">Set your new account password</p>
               </div>
 
               <div className="space-y-4">
-                <input
-                  type="password"
-                  placeholder="New password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full rounded-xl border border-border bg-background px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
-                />
-                <input
-                  type="password"
-                  placeholder="Confirm new password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="w-full rounded-xl border border-border bg-background px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
-                />
+                <div className="rounded-xl border border-border bg-surface-muted px-3.5 py-3">
+                  <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    Password must include
+                  </p>
+                  <div className="space-y-1.5 text-xs">
+                    {[
+                      { ok: passwordChecks.minLength, label: "Minimum: 12 characters" },
+                      { ok: passwordChecks.uppercase, label: "Uppercase (A-Z)" },
+                      { ok: passwordChecks.lowercase, label: "Lowercase (a-z)" },
+                      { ok: passwordChecks.number, label: "Numbers (0-9)" },
+                      { ok: passwordChecks.symbol, label: "Symbols (@ # $ %)" },
+                    ].map((rule) => (
+                      <p
+                        key={rule.label}
+                        className={cn(
+                          "flex items-center gap-2",
+                          rule.ok ? "text-success" : "text-muted-foreground",
+                        )}
+                      >
+                        {rule.ok ? (
+                          <CheckCircle2 className="h-3.5 w-3.5" />
+                        ) : (
+                          <Circle className="h-3.5 w-3.5" />
+                        )}{" "}
+                        {rule.label}
+                      </p>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="new-password"
+                    className="mb-1.5 block text-xs font-medium text-muted-foreground"
+                  >
+                    New password
+                  </label>
+                  <div className="relative">
+                    <input
+                      id="new-password"
+                      type={showPassword ? "text" : "password"}
+                      autoComplete="new-password"
+                      placeholder="••••••••"
+                      value={password}
+                      onChange={(e) => {
+                        setPassword(e.target.value);
+                        if (error) setError(null);
+                      }}
+                      onKeyDown={(e) => e.key === "Enter" && canResetPassword && handleResetPassword()}
+                      className={cn(
+                        "w-full rounded-xl border bg-background px-4 py-3 pr-12 text-sm outline-none transition-all",
+                        "focus:ring-2 focus:ring-primary/30 focus:border-primary",
+                        error?.includes("Password")
+                          ? "border-destructive focus:ring-destructive/30 focus:border-destructive"
+                          : "border-border",
+                      )}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword((v) => !v)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-1 text-muted-foreground transition hover:bg-secondary hover:text-foreground"
+                      aria-label={showPassword ? "Hide password" : "Show password"}
+                    >
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="confirm-new-password"
+                    className="mb-1.5 block text-xs font-medium text-muted-foreground"
+                  >
+                    Confirm New Password
+                  </label>
+                  <div className="relative">
+                    <input
+                      id="confirm-new-password"
+                      type={showConfirmPassword ? "text" : "password"}
+                      autoComplete="new-password"
+                      placeholder="••••••••"
+                      value={confirmPassword}
+                      onChange={(e) => {
+                        setConfirmPassword(e.target.value);
+                        if (error) setError(null);
+                      }}
+                      onKeyDown={(e) => e.key === "Enter" && canResetPassword && handleResetPassword()}
+                      className={cn(
+                        "w-full rounded-xl border bg-background px-4 py-3 pr-12 text-sm outline-none transition-all",
+                        "focus:ring-2 focus:ring-primary/30 focus:border-primary",
+                        !passwordMatch && confirmPassword
+                          ? "border-destructive focus:ring-destructive/30 focus:border-destructive"
+                          : "border-border",
+                      )}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPassword((v) => !v)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-1 text-muted-foreground transition hover:bg-secondary hover:text-foreground"
+                      aria-label={
+                        showConfirmPassword ? "Hide confirm password" : "Show confirm password"
+                      }
+                    >
+                      {showConfirmPassword ? (
+                        <EyeOff className="h-4 w-4" />
+                      ) : (
+                        <Eye className="h-4 w-4" />
+                      )}
+                    </button>
+                  </div>
+                </div>
               </div>
+
               {error && (
                 <p className="mt-4 text-center text-xs text-destructive animate-fade-in">{error}</p>
               )}
 
               <button
                 onClick={handleResetPassword}
-                disabled={verifying || !password || !confirmPassword}
-                className="mt-6 w-full rounded-xl bg-primary px-4 py-3 text-sm font-medium text-primary-foreground shadow-elegant transition-all hover:opacity-90 disabled:opacity-60"
+                disabled={verifying || !canResetPassword}
+                className={cn(
+                  "mt-6 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-medium text-primary-foreground shadow-elegant transition-all",
+                  "hover:opacity-90 hover:-translate-y-0.5 active:translate-y-0",
+                  "disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:translate-y-0",
+                )}
               >
                 {verifying ? (
-                  <Loader2 className="mx-auto h-4 w-4 animate-spin" />
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Resetting Password...
+                  </>
                 ) : (
                   "Reset Password"
                 )}

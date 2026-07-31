@@ -67,9 +67,6 @@ exports.verifyOtp = async (req, res, next) => {
       return res.status(400).json({ success: false, message: 'Invalid or expired OTP' });
     }
 
-    // OTP is valid, remove it from DB
-    await OTP.deleteOne({ _id: otpRecord._id });
-
     res.status(200).json({ success: true, message: 'OTP verified' });
   } catch (err) {
     next(err);
@@ -96,6 +93,8 @@ exports.signup = async (req, res, next) => {
     
     const newUser = new User({ email, passwordHash: password });
     await newUser.save();
+
+    await OTP.deleteMany({ email });
 
     const token = jwt.sign({ id: newUser._id }, process.env.JWT_SECRET, { expiresIn: '7d' });
 
