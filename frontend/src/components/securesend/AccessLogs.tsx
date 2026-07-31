@@ -17,18 +17,9 @@ export function AccessLogs({
   return (
     <div className="flex h-full flex-col bg-surface">
       <div className="border-b border-border px-6 py-4">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => onToggleSidebar?.()}
-            className="lg:hidden rounded-full p-2 hover:bg-secondary transition-colors -ml-2"
-            aria-label="Open menu"
-          >
-            <Menu className="h-5 w-5 text-muted-foreground" />
-          </button>
-          <div className="flex items-center gap-2">
-            <Activity className="h-5 w-5 text-primary" />
-            <h2 className="text-lg font-semibold tracking-tight">Access Logs</h2>
-          </div>
+        <div className="flex items-center gap-2">
+          <Activity className="h-5 w-5 text-primary" />
+          <h2 className="text-lg font-semibold tracking-tight">Access Logs</h2>
         </div>
         <p className="mt-0.5 text-sm text-muted-foreground">
           Every time someone opens a message you sent.

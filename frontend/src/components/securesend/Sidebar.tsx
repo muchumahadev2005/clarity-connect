@@ -8,7 +8,6 @@ import {
   Menu,
   VenetianMask,
   LogOut,
-  X,
 } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import type { Folder } from "./types";
@@ -102,15 +101,6 @@ export function Sidebar({ active, onSelect, onCompose, counts, collapsed, onTogg
               </Link>
             )}
           </div>
-          {!collapsed && (
-            <button
-              onClick={onToggle}
-              className="rounded-full p-1.5 hover:bg-secondary text-muted-foreground lg:hidden"
-              aria-label="Close sidebar"
-            >
-              <X className="h-5 w-5" />
-            </button>
-          )}
         </div>
 
         {/* New Secure Message Action */}

@@ -78,16 +78,7 @@ export function MessageList({
     <div className="flex h-full flex-col bg-surface">
       <div className="border-b border-border px-5 py-4">
         <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => onToggleSidebar?.()}
-              className="lg:hidden rounded-full p-2 hover:bg-secondary transition-colors"
-              aria-label="Open menu"
-            >
-              <Menu className="h-5 w-5 text-muted-foreground" />
-            </button>
-            <h2 className="text-lg font-semibold tracking-tight">{folderTitle[folder]}</h2>
-          </div>
+          <h2 className="text-lg font-semibold tracking-tight">{folderTitle[folder]}</h2>
           <span className="text-xs text-muted-foreground">{messages.length} messages</span>
         </div>
         <div className="mt-3 flex items-center gap-2 rounded-full bg-surface-muted px-4 py-2">
