@@ -20,6 +20,8 @@ public class CorsConfig {
                 "http://localhost:*",
                 "http://127.0.0.1:*",
                 "https://clarity-connect.onrender.com",
+                "https://clarity-connect-1.onrender.com",
+                "https://*.onrender.com",
                 "https://clarity-connect-gray.vercel.app",
                 "https://clarity-connect.pages.dev",
                 "https://clarity-connect.mahadevmuchu1.workers.dev",

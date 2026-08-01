@@ -11,8 +11,8 @@ const getBaseUrl = () => {
   // Dev default: backend runs separately on port 5000
   if (import.meta.env.DEV) return "http://localhost:5000/api";
 
-  // Prod default: same origin (e.g. https://securesend.co.in/api)
-  return `${window.location.origin}/api`;
+  // Prod default: Render Java backend
+  return "https://clarity-connect-1.onrender.com/api";
 };
 
 const api = axios.create({
