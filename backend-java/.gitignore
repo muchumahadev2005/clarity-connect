@@ -1,5 +1,8 @@
-# Dependency directories
+# Dependency & Build directories
 node_modules/
+target/
+apache-maven-3.9.9/
+storage/
 
 # Environment variables
 .env

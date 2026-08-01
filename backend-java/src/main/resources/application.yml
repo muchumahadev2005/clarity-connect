@@ -1,0 +1,50 @@
+server:
+  port: ${PORT:5000}
+  servlet:
+    encoding:
+      charset: UTF-8
+      enabled: true
+      force: true
+
+spring:
+  application:
+    name: securesend-backend
+  data:
+    mongodb:
+      uri: ${MONGODB_URI:mongodb://127.0.0.1:27017/securesend}
+      auto-index-creation: false
+  servlet:
+    multipart:
+      max-file-size: ${MAX_FILE_SIZE:50MB}
+      max-request-size: ${MAX_REQUEST_SIZE:50MB}
+  mail:
+    host: ${SMTP_HOST:smtp.gmail.com}
+    port: ${SMTP_PORT:587}
+    username: ${SMTP_USER:}
+    password: ${SMTP_PASS:}
+    properties:
+      mail:
+        smtp:
+          auth: ${SMTP_AUTH:true}
+          starttls:
+            enable: ${SMTP_STARTTLS:true}
+
+securesend:
+  jwt:
+    secret: ${JWT_SECRET:your_jwt_secret_key_here_must_be_at_least_256_bits_long_for_hs256_security_spec}
+    expiration-ms: 604800000 # 7 days in ms
+  resend:
+    api-key: ${RESEND_API_KEY:}
+    from: ${RESEND_FROM:SecureSend <noreply@securesend.co.in>}
+  email:
+    auth-provider: ${AUTH_EMAIL_PROVIDER:resend}
+    anon-provider: ${ANON_EMAIL_PROVIDER:resend}
+  storage:
+    max-inline-bytes: ${MAX_INLINE_MESSAGE_BYTES:12582912} # 12 MB
+    payload-path: storage/messages
+
+logging:
+  level:
+    root: INFO
+    com.securesend: DEBUG
+    org.springframework.data.mongodb.core.MongoTemplate: DEBUG
