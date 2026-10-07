@@ -1,477 +1,1353 @@
-# SecureSend API
+# SecureSend — Complete Project Documentation
 
-SecureSend is a secure messaging platform that lets users exchange end-to-end encrypted text, image, voice, and file messages, send anonymous emails through disposable aliases, and manage public encryption keys for hybrid encryption.
+This single document merges all four project READMEs into one place:
 
-This document describes every API endpoint exposed by the backend, including request/response formats, authentication requirements, and rate limits.
+1. **System Architecture** — how the frontend and two backends fit together
+2. **Node.js Backend** (`backend-node/`) — Express + MongoDB API
+3. **Java Backend** (`backend-java/`) — Spring Boot + MongoDB API (same contract as Node)
+4. **Frontend** (`frontend/`) — React + TanStack Start app
 
-## Base URL
+---
 
-All routes are relative to the API root, for example:
+## 📑 Table of Contents
+
+- [Part 1 — System Architecture](#part-1--system-architecture)
+- [Part 2 — Node.js Backend](#part-2--nodejs-backend)
+- [Part 3 — Java Backend](#part-3--java-backend)
+- [Part 4 — Frontend](#part-4--frontend)
+
+---
+
+# Part 1 — System Architecture
+
+## SecureSend — System Architecture Overview
+
+SecureSend is a zero-knowledge, end-to-end encrypted messaging platform with a dual-implementation backend and a single shared frontend. This document ties together the three project folders:
+
+- **`frontend/`** — React 19 + TanStack Start SPA (see the **Frontend** section)
+- **`backend-node/`** — Express + MongoDB API (see the **Node.js Backend** section)
+- **`backend-java/`** — Spring Boot + MongoDB API, functional twin of `backend-node` (see the **Java Backend** section)
+
+Both backends implement the **exact same API contract** and read/write the **same MongoDB schema**, so the frontend can point at either one with just an environment variable change.
+
+---
+
+### 1. High-Level System Diagram
+
+```mermaid
+flowchart TB
+    subgraph Client["User's Browser"]
+        direction TB
+        UI[SecureSend UI<br/>React / TanStack Start]
+        WC[Web Crypto API<br/>AES-256-GCM + RSA-OAEP-2048]
+        LS[(localStorage<br/>JWT + RSA keypair)]
+        UI <--> WC
+        UI <--> LS
+    end
+
+    subgraph Edge["Deployment Edge"]
+        CF[Cloudflare Workers / Vercel<br/>frontend hosting]
+    end
+
+    subgraph BackendChoice["Choose one backend (interchangeable)"]
+        direction LR
+        NODE["backend-node<br/>Express + Mongoose<br/>Render"]
+        JAVA["backend-java<br/>Spring Boot<br/>Render (production default)"]
+    end
+
+    subgraph Data["Shared Data Layer"]
+        MDB[(MongoDB<br/>users, messages, keys,<br/>aliases, logs, otps,<br/>anonymousmessages)]
+        FS[(Disk storage<br/>large payload offload)]
+    end
+
+    subgraph Ext["External Services"]
+        MAIL[Resend API / SMTP]
+    end
+
+    UI -- HTTPS --> CF --> UI
+    UI -- "Bearer JWT, ciphertext only" --> NODE
+    UI -- "Bearer JWT, ciphertext only" --> JAVA
+    NODE --> MDB
+    JAVA --> MDB
+    NODE --> FS
+    JAVA --> FS
+    NODE --> MAIL
+    JAVA --> MAIL
+```
+
+---
+
+### 2. Why Two Backends?
+
+`backend-java` is a Spring Boot re-implementation of `backend-node`, built to the identical route/response contract. This lets the team:
+
+- Compare performance/operational characteristics of Node vs. JVM for the same workload.
+- Migrate production traffic without a data migration (both share one MongoDB database).
+- Fail over from one to the other if needed — the frontend's `lib/api.ts` only needs a `VITE_API_URL` change.
+
+| | backend-node | backend-java |
+|---|---|---|
+| Language | JavaScript (Node.js) | Java 21 |
+| Framework | Express 4 | Spring Boot 3.3 |
+| ORM/ODM | Mongoose | Spring Data MongoDB |
+| Auth | JWT (`jsonwebtoken`) + bcryptjs | JWT (`jjwt`) + Spring Security `BCryptPasswordEncoder` |
+| Rate limiting | `express-rate-limit`, per-route | Not yet ported |
+| Current production role | Available / dev default | Default production target (`clarity-connect-1.onrender.com`) |
+
+---
+
+### 3. Zero-Knowledge Encryption Model
+
+The single most important architectural property of SecureSend: **the server never has access to plaintext or private keys.**
+
+```mermaid
+flowchart LR
+    subgraph SenderBrowser["Sender's Browser"]
+        P1[Plaintext message] --> E1[AES-256-GCM encrypt]
+        E1 --> C1[Ciphertext + IV]
+        K1[Fresh AES key] --> E1
+        K1 --> W1[RSA-OAEP wrap<br/>with recipient's public key]
+        W1 --> WK1[Wrapped AES key]
+    end
+
+    subgraph ServerLayer["Backend (Node or Java)"]
+        DB[(MongoDB<br/>stores only ciphertext<br/>+ wrapped key + IV)]
+    end
+
+    subgraph RecipientBrowser["Recipient's Browser"]
+        WK2[Wrapped AES key] --> U1[RSA-OAEP unwrap<br/>with own private key]
+        U1 --> K2[AES key]
+        C2[Ciphertext + IV] --> D1[AES-256-GCM decrypt]
+        K2 --> D1
+        D1 --> P2[Plaintext message]
+    end
+
+    C1 -->|POST /api/messages| DB
+    WK1 -->|POST /api/messages| DB
+    DB -->|GET /api/messages/inbox| C2
+    DB -->|GET /api/messages/inbox| WK2
+```
+
+Private RSA keys are generated by the browser's Web Crypto API and stored **only** in that browser's `localStorage` — they are never transmitted to either backend.
+
+---
+
+### 4. Shared Data Model Summary
+
+Both backends operate on the same seven MongoDB collections:
+
+| Collection | Purpose | Notable indexing |
+|---|---|---|
+| `users` | Accounts (email, bcrypt hash, public key) | unique `email` |
+| `otps` | Signup / password-reset one-time codes | TTL, 10-minute expiry |
+| `aliases` | Disposable `*@securesend.co.in` email aliases | TTL, 24-hour expiry; compound `{realEmail, isActive}` |
+| `messages` | E2E-encrypted message envelopes | index on `expiresAt` |
+| `keys` | RSA public keys per user | unique `userId` |
+| `logs` | Per-message view/decrypt/delete audit trail | index on `messageId` |
+| `anonymousmessages` | Anonymous email thread records | index on `to` |
+
+See each backend's README for full field-level schemas (the **Node.js Backend** section §4, the **Java Backend** section §4) — they're identical.
+
+---
+
+### 5. Request Lifecycle (Either Backend)
+
+```mermaid
+sequenceDiagram
+    participant FE as Frontend
+    participant CORS as CORS layer
+    participant RL as Rate limiter
+    participant AUTH as JWT auth middleware/filter
+    participant CTRL as Controller/Route handler
+    participant SVC as Service layer
+    participant DB as MongoDB
+
+    FE->>CORS: HTTPS request (+ Bearer JWT if authenticated route)
+    CORS->>RL: origin allowed
+    RL->>AUTH: within limit
+    AUTH->>CTRL: token valid (or route is public)
+    CTRL->>SVC: delegate business logic
+    SVC->>DB: read/write
+    DB-->>SVC: result
+    SVC-->>CTRL: domain object / error
+    CTRL-->>FE: { success, data|message }
+```
+
+---
+
+### 6. Deployment Topology (as configured in the repo)
+
+| Component | Platform(s) referenced in CORS / config |
+|---|---|
+| Frontend | Cloudflare Workers (`wrangler.jsonc`), Vercel (`*.vercel.app`), Cloudflare Pages (`*.pages.dev`) |
+| backend-node | Render (`clarity-connect.onrender.com`), local `:5000` |
+| backend-java | Render (`clarity-connect-1.onrender.com`, `*.onrender.com`), local `:5000` |
+| Database | MongoDB (Atlas or self-hosted — connection via `MONGODB_URI`) |
+| Email | Resend API (primary), SMTP (fallback) |
+
+Custom domains referenced: `securesend.co.in`, `www.securesend.co.in`, `message.securesend.co.in`, `www.message.securesend.co.in`.
+
+---
+
+### 7. Where to Go Next
+
+- **API details** (every endpoint, request/response body): top-level [`README.md`](#-api-reference-full-endpoint-details), or the equivalent section in the **Node.js Backend** section / the **Java Backend** section.
+- **Frontend routes and components**: the **Frontend** section.
+- **Encryption internals**: `frontend/src/components/securesend/crypto.ts`, documented in the **Frontend** section §7.
+
+
+---
+
+# Part 2 — Node.js Backend
+
+## SecureSend — Node.js Backend
+
+Express + MongoDB implementation of the SecureSend API. This is one of two interchangeable backend implementations in this repository (the other is `backend-java`, a Spring Boot port of the same API contract). Either one can serve the `frontend` app unmodified, since both expose the same routes, request/response shapes, and MongoDB collections.
+
+> SecureSend lets users exchange end-to-end encrypted text/image/voice/file messages, send anonymous emails through disposable aliases, and manage public keys for hybrid (RSA + AES) encryption. The server **never sees plaintext** — all encryption/decryption happens in the browser (see `frontend/src/components/securesend/crypto.ts`).
+
+---
+
+### 1. Tech Stack
+
+| Layer | Technology |
+|---|---|
+| Runtime | Node.js (CommonJS) |
+| Web framework | Express 4 |
+| Database | MongoDB (via Mongoose 8) |
+| Auth | JWT (`jsonwebtoken`), bcrypt password hashing (`bcryptjs`, 12 rounds) |
+| Email | `resend` (primary) / `nodemailer` (SMTP fallback) |
+| Rate limiting | `express-rate-limit` |
+| Dev tooling | `nodemon` |
+
+---
+
+### 2. Project Structure
 
 ```
-https://<your-deployment-domain>/api
+backend-node/
+├── src/
+│   ├── server.js              # Entry point — connects Mongo, starts cron, starts HTTP server
+│   ├── app.js                 # Express app: CORS, body parsing, route mounting, error handler
+│   ├── config/
+│   │   ├── db.js              # Mongoose connection helper
+│   │   └── env.js             # Environment variable loader
+│   ├── models/                # Mongoose schemas (see §4 Data Model)
+│   ├── controllers/           # Route handler logic per resource
+│   ├── services/               # Business logic (aliasing, mail, cleanup, key mgmt, payload storage)
+│   ├── middleware/
+│   │   ├── auth.middleware.js # JWT verification, attaches req.user
+│   │   ├── rateLimiter.js     # Named limiters (see §6)
+│   │   └── error.middleware.js
+│   ├── routes/                # Express routers, one per resource
+│   └── utils/
+│       ├── logger.js
+│       └── payloadStorage.js  # Offloads large message payloads (> MAX_INLINE_MESSAGE_BYTES) to disk
+├── package.json
+└── ALIAS_SYSTEM_GUIDE.js      # Design notes for the disposable-alias subsystem
 ```
 
-The `mail` routes are mounted at the application root (no `/api` prefix) — see the Mail section below.
+---
 
-## Authentication
+### 3. Architecture
 
-Most endpoints require a JSON Web Token issued by the `/api/auth/login` or `/api/auth/signup` endpoints.
+```mermaid
+flowchart TB
+    subgraph Client["Frontend (React / TanStack Start)"]
+        UI[Browser UI]
+        WC[Web Crypto API<br/>AES-GCM + RSA-OAEP]
+    end
 
-Send the token as a Bearer token on every authenticated request:
+    subgraph API["backend-node (Express)"]
+        MW1[CORS + JSON body parser]
+        MW2[Rate limiters]
+        MW3[JWT auth middleware]
+        R1[auth.routes]
+        R2[message.routes]
+        R3[key.routes]
+        R4[user.routes]
+        R5[anonymous.routes]
+        R6[mail.routes]
+        SVC[Services layer<br/>alias / key / message / mail / cleanup]
+        ERR[Global error handler]
+    end
 
+    subgraph Data["Persistence"]
+        MDB[(MongoDB)]
+        FS[(Local disk<br/>storage/messages<br/>large payload offload)]
+    end
+
+    subgraph External["External services"]
+        RESEND[Resend / SMTP]
+    end
+
+    UI -- plaintext, only in-browser --> WC
+    WC -- ciphertext only --> UI
+    UI -- HTTPS + Bearer JWT --> MW1 --> MW2 --> MW3
+    MW3 --> R1 & R2 & R3 & R4 & R5 & R6
+    R1 & R2 & R3 & R4 & R5 & R6 --> SVC
+    SVC --> MDB
+    SVC --> FS
+    SVC --> RESEND
+    SVC -.-> ERR
 ```
-Authorization: Bearer <token>
+
+**Key design decisions**
+
+- **Zero-knowledge server**: the API only ever stores/forwards ciphertext (`encryptedData`, `encryptedAESKey`, `iv`, `salt`). Plaintext and private keys never leave the browser.
+- **Hybrid encryption**: a fresh AES-256-GCM key encrypts the message body; that AES key is wrapped with the recipient's RSA-OAEP-2048 public key so only the recipient can unwrap it.
+- **Stateless auth**: JWT bearer tokens (7-day expiry), no server-side sessions — horizontally scalable.
+- **TTL-based expiry**: MongoDB TTL indexes auto-delete expired OTPs (`otp.model.js`, 10 min) and aliases (`alias.model.js`, on `expiresAt`); messages are lazily wiped of their encrypted payload when read past `expiresAt`, and a monthly cron (`cleanup.service.js`) purges them outright.
+- **Large payload offload**: message payloads over `MAX_INLINE_MESSAGE_BYTES` (default 12 MB, e.g. voice/file attachments) are written to disk via `payloadStorage.js` instead of inflating MongoDB documents.
+
+---
+
+### 4. Data Model (MongoDB Collections)
+
+#### `users`
+| Field | Type | Notes |
+|---|---|---|
+| `_id` | ObjectId | |
+| `email` | String | unique, lowercase, trimmed |
+| `passwordHash` | String | bcrypt (12 rounds), hashed via pre-save hook |
+| `publicKey` | String \| null | RSA public key (also mirrored in `keys` collection) |
+| `createdAt` / `updatedAt` | Date | timestamps |
+
+#### `otps`
+| Field | Type | Notes |
+|---|---|---|
+| `email` | String | |
+| `otp` | String | 6-digit code |
+| `createdAt` | Date | **TTL index — document auto-deletes after 600s** |
+
+#### `aliases`
+| Field | Type | Notes |
+|---|---|---|
+| `alias` | String | unique, format `name123@securesend.co.in` |
+| `realEmail` | String | owner's real email, indexed |
+| `isActive` | Boolean | default `true`, indexed |
+| `expiresAt` | Date | **TTL index (`expireAfterSeconds: 0`)** — 24h lifetime |
+| `createdAt` | Date | |
+
+Compound index: `{ realEmail: 1, isActive: 1 }` for fast "does this user already have an active alias" lookups.
+
+#### `messages`
+| Field | Type | Notes |
+|---|---|---|
+| `encryptedData` | String | AES-GCM ciphertext (base64) |
+| `encryptedAESKey` | String | RSA-wrapped AES key (base64) |
+| `iv` | String | AES-GCM IV (base64) |
+| `salt` | String \| null | PBKDF2 salt (symmetric/password mode) |
+| `keyIv` | String \| null | |
+| `encryptionMode` | Enum | `HYBRID` \| `SYMMETRIC` |
+| `kdf`, `kdfIterations` | String / Number | key-derivation metadata |
+| `aesAlgorithm`, `rsaAlgorithm` | String | |
+| `senderId` / `receiverId` | ObjectId → `users` | |
+| `type` | Enum | `text` \| `image` \| `voice` \| `file` |
+| `protection` | Enum | `quick` \| `password` \| `key` \| `hybrid` |
+| `password` | String \| null | optional passphrase gate |
+| `fileUrl` | String \| null | pointer to offloaded payload on disk |
+| `isAnonymous` | Boolean | |
+| `viewOnce` | Boolean | payload wiped after first genuine view |
+| `expiresAt` | Date \| null | indexed |
+| `views` | Number | |
+| `logs[]` | Array | `{ viewedAt, ip, device, userId }` per view |
+| `createdAt` / `updatedAt` | Date | |
+
+#### `keys`
+| Field | Type | Notes |
+|---|---|---|
+| `userId` | ObjectId → `users` | unique — one primary key per user |
+| `publicKey` | String | |
+
+#### `logs`
+| Field | Type | Notes |
+|---|---|---|
+| `messageId` | ObjectId → `messages` | indexed |
+| `userId` | ObjectId → `users` \| null | |
+| `event` | Enum | `created` \| `viewed` \| `decrypted` \| `deleted` \| `failed_attempt` |
+| `ipAddress`, `device` | String | |
+| `status` | Enum | `success` \| `failed` |
+| `details` | String \| null | |
+
+#### `anonymousmessages`
+| Field | Type | Notes |
+|---|---|---|
+| `to` | String | recipient email or alias, indexed |
+| `subject`, `message` | String | |
+| `senderAlias` | String | |
+| `unread` | Boolean | default `true` |
+| `createdAt` / `updatedAt` | Date | |
+
+#### Entity Relationships
+
+```mermaid
+erDiagram
+    USER ||--o| KEY : "has one"
+    USER ||--o{ ALIAS : "owns"
+    USER ||--o{ MESSAGE : "sends (senderId)"
+    USER ||--o{ MESSAGE : "receives (receiverId)"
+    MESSAGE ||--o{ LOG : "generates"
+    ALIAS ||--o{ ANONYMOUSMESSAGE : "sends/receives via"
+    USER ||--o{ OTP : "requests"
 ```
 
-Tokens are valid for 7 days. Endpoints that don't require authentication are explicitly marked **Public** below.
+---
 
-## Standard Response Shape
+### 5. API Reference
 
-Most endpoints return JSON in one of these two shapes:
+Base path: `/api` (mail routes are mounted at the root — see below). Full endpoint-by-endpoint documentation, including request/response bodies, lives in the top-level [`README.md`](#-api-reference-full-endpoint-details) of this repository. Summary:
 
-Success:
+| Resource | Base Path | Auth | Description |
+|---|---|---|---|
+| Auth | `/api/auth` | Mixed | OTP signup, login, password reset, `GET /me` |
+| Messages | `/api/messages` | Mixed | Send/read/delete encrypted messages, public share links |
+| Keys | `/api/keys` | Required | Register/fetch/delete RSA public keys |
+| Users | `/api/users` | Required | Search users by email for recipient selection |
+| Anonymous | `/api/anonymous` | Mixed | Disposable alias + anonymous email inbox/outbox |
+| Mail | `/` (root, no `/api` prefix) | Required | Generic transactional email send |
+
+#### Standard response envelope
+
 ```json
-{
-  "success": true,
-  "data": { ... },
-  "message": "optional message"
-}
+// success
+{ "success": true, "data": { }, "message": "optional" }
+
+// error
+{ "success": false, "message": "Description of what went wrong" }
 ```
 
-Error:
-```json
-{
-  "success": false,
-  "message": "Description of what went wrong"
-}
-```
+#### Route table
 
-## Rate Limiting
+| Method | Path | Auth | Rate Limiter |
+|---|---|---|---|
+| POST | `/api/auth/request-otp` | Public | `authLimiter` |
+| POST | `/api/auth/verify-otp` | Public | `authLimiter` |
+| POST | `/api/auth/signup` | Public | `authLimiter` |
+| POST | `/api/auth/login` | Public | `authLimiter` |
+| POST | `/api/auth/forgot-password` | Public | `authLimiter` |
+| POST | `/api/auth/reset-password` | Public | `authLimiter` |
+| GET | `/api/auth/me` | Required | `generalApiLimiter` |
+| POST | `/api/messages` | Required | `messageLimiter` |
+| GET | `/api/messages/inbox` | Required | `generalApiLimiter` |
+| GET | `/api/messages/outbox` | Required | `generalApiLimiter` |
+| GET | `/api/messages/:id` | Public (share link) | `publicMessageLimiter` |
+| POST | `/api/messages/:id/view` | Public (share link) | `publicMessageLimiter` |
+| DELETE | `/api/messages/expired` | Required | `generalApiLimiter` |
+| DELETE | `/api/messages/:id` | Required (sender/receiver only) | `generalApiLimiter` |
+| POST | `/api/keys/register` | Required | `generalApiLimiter` |
+| GET | `/api/keys/:userId` | Required | `generalApiLimiter` |
+| GET | `/api/keys/me/current` | Required | `generalApiLimiter` |
+| DELETE | `/api/keys/clear` | Required | `generalApiLimiter` |
+| GET | `/api/users/search?q=&protection=` | Required | global |
+| POST | `/api/anonymous/send` | Public | `sendAnonymousEmailLimiter` |
+| POST | `/api/anonymous/generate-alias` | Required | `generalApiLimiter` |
+| GET | `/api/anonymous/inbox` | Required | `generalApiLimiter` |
+| POST | `/api/anonymous/mark-read/:id` | Required | `generalApiLimiter` |
+| POST | `/send-email` | Required | — |
 
-Rate limits are applied per IP address. If a limit is exceeded, the API responds with `429 Too Many Requests` and the following body:
-
-```json
-{
-  "success": false,
-  "status": 429,
-  "error": "Too Many Requests",
-  "message": "..."
-}
-```
+### 6. Rate Limiting
 
 | Limiter | Window | Max Requests | Applied To |
 |---|---|---|---|
-| `authLimiter` | 15 minutes | 5 | Auth endpoints (OTP, login, signup, password reset) |
-| `messageLimiter` | 1 minute | 20 | Sending a secure message |
-| `generalApiLimiter` | 1 minute | 60 | Most authenticated GET/DELETE endpoints |
-| `sendAnonymousEmailLimiter` | 1 minute | 10 | Sending an anonymous email |
-| `publicMessageLimiter` | 1 minute | 5 | Public message read/view-tracking endpoints |
+| `authLimiter` | 15 min | 5 | OTP, login, signup, password reset |
+| `messageLimiter` | 1 min | 20 | Sending a secure message |
+| `generalApiLimiter` | 1 min | 60 | Most authenticated GET/DELETE endpoints |
+| `sendAnonymousEmailLimiter` | 1 min | 10 | Sending an anonymous email |
+| `publicMessageLimiter` | 1 min | 5 | Public message read/view-tracking |
+
+Exceeding a limit returns `429` with `{ "success": false, "status": 429, "error": "Too Many Requests", "message": "..." }`.
 
 ---
 
-## Table of Contents
+### 7. End-to-End Flows
 
-- [Auth](#auth)
-- [Messages](#messages)
-- [Keys](#keys)
-- [Users](#users)
-- [Anonymous Messaging](#anonymous-messaging)
-- [Mail](#mail)
+#### 7.1 Signup / Login
 
----
+```mermaid
+sequenceDiagram
+    participant B as Browser
+    participant API as backend-node
+    participant M as MongoDB
+    participant E as Resend/SMTP
 
-## Auth
-
-Base path: `/api/auth`
-
-### `POST /api/auth/request-otp`
-Request a one-time password to begin signup for a new email address. **Public.** Rate limited by `authLimiter`.
-
-**Body**
-```json
-{ "email": "user@example.com" }
+    B->>API: POST /api/auth/request-otp {email}
+    API->>M: upsert OTP doc (TTL 10 min)
+    API->>E: send OTP email
+    E-->>B: OTP email delivered
+    B->>API: POST /api/auth/verify-otp {email, otp}
+    API->>M: validate OTP
+    API-->>B: 200 verified
+    B->>API: POST /api/auth/signup {email, password}
+    API->>API: validate password policy
+    API->>M: create User (bcrypt hash, 12 rounds)
+    API-->>B: 201 {token, user}
+    B->>B: store JWT (7d) in localStorage
 ```
 
-**Responses**
-- `200` — `{ "success": true, "message": "OTP sent to email" }`
-- `400` — user already exists
+#### 7.2 Sending an End-to-End Encrypted Message (Hybrid)
 
----
+```mermaid
+sequenceDiagram
+    participant S as Sender (browser)
+    participant API as backend-node
+    participant M as MongoDB
+    participant R as Recipient (browser)
 
-### `POST /api/auth/verify-otp`
-Verify a signup or password-reset OTP. **Public.** Rate limited by `authLimiter`.
-
-**Body**
-```json
-{ "email": "user@example.com", "otp": "123456" }
+    S->>API: GET /api/keys/:userId (recipient's public key)
+    API->>M: lookup Key by userId
+    API-->>S: publicKey (RSA-OAEP)
+    S->>S: generate AES-256 key
+    S->>S: encrypt message (AES-GCM) -> encryptedData, iv
+    S->>S: wrap AES key with recipient RSA pubkey -> encryptedAESKey
+    S->>API: POST /api/messages {encryptedData, encryptedAESKey, iv, type, protection, expiresIn,...}
+    API->>M: insert Message doc
+    API-->>S: 201 {message}
+    Note over S,R: server only ever stored/forwarded ciphertext
+    R->>API: GET /api/messages/inbox (JWT)
+    API->>M: query by receiverId, wipe payload if expired
+    API-->>R: messages[]
+    R->>R: unwrap AES key with own RSA private key
+    R->>R: decrypt ciphertext locally -> plaintext
+    R->>API: POST /api/messages/:id/view
+    API->>M: push log entry, increment views, wipe payload if viewOnce
 ```
 
-**Responses**
-- `200` — `{ "success": true, "message": "OTP verified" }`
-- `400` — invalid or expired OTP
+#### 7.3 Anonymous Email via Disposable Alias
 
----
+```mermaid
+sequenceDiagram
+    participant U as Authenticated User
+    participant API as backend-node
+    participant M as MongoDB
+    participant E as Resend/SMTP
+    participant T as Third-party recipient
 
-### `POST /api/auth/signup`
-Complete signup by setting a password. **Public.** Rate limited by `authLimiter`.
-
-**Body**
-```json
-{ "email": "user@example.com", "password": "MyStrongPassw0rd@" }
+    U->>API: POST /api/anonymous/generate-alias {force:false}
+    API->>M: find active Alias for user, else create (TTL 24h)
+    API-->>U: {alias, expiresAt}
+    U->>API: POST /api/anonymous/send {to, subject, message, alias}
+    API->>M: verify alias is active & unexpired
+    API->>M: resolve "to" if it's a securesend.co.in alias
+    API->>M: persist AnonymousMessage
+    API->>E: dispatch email from alias
+    E-->>T: email delivered (real sender identity hidden)
 ```
 
-Password requirements (all enforced):
-- Minimum 12 characters
-- At least one uppercase letter
-- At least one lowercase letter
-- At least one number
-- At least one symbol (`@ # $ %`)
+#### 7.4 Message Expiry & Cleanup
 
-**Responses**
-- `201` — `{ "success": true, "token": "<jwt>", "user": { "email": "user@example.com" } }`
-- `400` — user already exists, or password missing requirements
-
----
-
-### `POST /api/auth/login`
-Log in with email and password. **Public.** Rate limited by `authLimiter`.
-
-**Body**
-```json
-{ "email": "user@example.com", "password": "MyStrongPassw0rd@" }
+```mermaid
+flowchart LR
+    A[Message created with expiresAt / viewOnce] --> B{Read via inbox/outbox/GET :id}
+    B -->|now > expiresAt| C[Wipe encryptedData, encryptedAESKey, iv, salt, keyIv, password, fileUrl]
+    B -->|viewOnce && genuine view| C
+    B -->|not expired| D[Return payload as-is]
+    E[Monthly cron - cleanup.service.js] --> F[DELETE /api/messages/expired equivalent]
+    F --> G[Documents with expired payload are purged from MongoDB]
 ```
 
-**Responses**
-- `200` — `{ "success": true, "token": "<jwt>", "user": { "email": "user@example.com" } }`
-- `401` — invalid credentials
-
 ---
 
-### `POST /api/auth/forgot-password`
-Request a password-reset OTP for an existing account. **Public.** Rate limited by `authLimiter`.
+### 8. Environment Variables
 
-**Body**
-```json
-{ "email": "user@example.com" }
-```
-
-**Responses**
-- `200` — `{ "success": true, "message": "Password reset code sent to email" }`
-- `404` — no user with this email
-
----
-
-### `POST /api/auth/reset-password`
-Reset a password using a verified OTP. **Public.** Rate limited by `authLimiter`.
-
-**Body**
-```json
-{ "email": "user@example.com", "otp": "123456", "newPassword": "MyNewStrongPassw0rd@" }
-```
-
-Same password requirements as signup.
-
-**Responses**
-- `200` — `{ "success": true, "message": "Password reset successfully" }`
-- `400` — invalid/expired OTP or password missing requirements
-- `404` — user not found
-
----
-
-### `GET /api/auth/me`
-Get the currently authenticated user's profile. **Requires auth.** Rate limited by `generalApiLimiter`.
-
-**Responses**
-- `200` — `{ "success": true, "user": { "email": "user@example.com" } }`
-- `404` — user not found
-
----
-
-## Messages
-
-Base path: `/api/messages`
-
-Messages carry end-to-end encrypted payloads (`encryptedData`, `encryptedAESKey`, `iv`, and optionally `salt`/`keyIv` for hybrid encryption). The server never sees plaintext content.
-
-### `POST /api/messages`
-Send a new encrypted message. **Requires auth.** Rate limited by `messageLimiter`.
-
-**Body**
-```json
-{
-  "encryptedData": "string (required)",
-  "encryptedAESKey": "string (required)",
-  "iv": "string (required)",
-  "salt": "string | null",
-  "keyIv": "string | null",
-  "encryptionMode": "HYBRID | SYMMETRIC",
-  "kdf": "string | null",
-  "kdfIterations": "number | null",
-  "aesAlgorithm": "string | null",
-  "rsaAlgorithm": "string | null",
-  "recipientEmail": "string (optional — recipient's email)",
-  "type": "text | image | voice | file",
-  "protection": "quick | hybrid (or other supported modes)",
-  "password": "string | null (optional passphrase protection)",
-  "isAnonymous": "boolean",
-  "viewOnce": "boolean",
-  "expiresIn": "number (ms from now, optional)",
-  "expiresAt": "ISO date string (optional, used if expiresIn absent)"
-}
-```
-
-Notes:
-- `encryptedData`, `encryptedAESKey`, and `iv` are required.
-- Voice messages (`type: "voice"`) are capped at 10 per sender per rolling hour.
-- Sending a message to yourself is rejected.
-- Large payloads (over `MAX_INLINE_MESSAGE_BYTES`, default 12 MB) are stored externally rather than inline in the database.
-
-**Responses**
-- `201` — `{ "success": true, "message": "Message sent successfully", "data": { ...message } }`
-- `400` — missing required encrypted fields, or attempting to message yourself
-- `429` — hourly voice message limit reached
-
----
-
-### `GET /api/messages/inbox`
-Get all messages received by the authenticated user, newest first. **Requires auth.** Rate limited by `generalApiLimiter`.
-
-Expired messages are automatically wiped of their encrypted payload (`encryptedData`, `encryptedAESKey`, `iv`, `salt`, `keyIv`, `password`, `fileUrl` are cleared) before being returned. View logs are included per message.
-
-**Responses**
-- `200` — `{ "success": true, "data": [ ...messages ] }`
-
----
-
-### `GET /api/messages/outbox`
-Get all messages sent by the authenticated user, newest first. **Requires auth.** Rate limited by `generalApiLimiter`.
-
-Same expiry-wiping behavior as inbox.
-
-**Responses**
-- `200` — `{ "success": true, "data": [ ...messages ] }`
-
----
-
-### `GET /api/messages/:id`
-Fetch a single message by ID — used for shared/public message links. **Public.** Rate limited by `publicMessageLimiter`.
-
-If the message has expired, its encrypted payload is wiped before the response is sent. The `password` field is never included in the response.
-
-**Responses**
-- `200` — `{ "success": true, "data": { "_id", "senderId", "receiverId", "type", "protection", "viewOnce", "expiresAt", "views", "createdAt", "encryptedData", "encryptedAESKey", "iv", "salt", "keyIv", "encryptionMode", "kdf", "kdfIterations", "aesAlgorithm", "rsaAlgorithm", "fileUrl" } }`
-- `404` — message not found
-
----
-
-### `POST /api/messages/:id/view`
-Mark a message as viewed and record a view log entry (viewer IP, device, timestamp, and viewer identity if authenticated). **Public.** Rate limited by `publicMessageLimiter`.
-
-- If the viewer is the original sender, the view is not counted or logged.
-- If the message is `viewOnce` and this is a genuine (non-sender) view, the encrypted payload is wiped immediately after.
-- An optional `Authorization: Bearer <token>` header may be sent to associate the view with a logged-in viewer; it is not required.
-
-**Responses**
-- `200` — `{ "success": true, "data": { "views": number, "logs": [ { "viewedAt", "ip", "device", "viewer" } ] } }`
-- `404` — message not found
-
----
-
-### `DELETE /api/messages/expired`
-Purge all expired messages system-wide (administrative/cleanup operation). **Requires auth.** Rate limited by `generalApiLimiter`.
-
-**Responses**
-- `200` — `{ "success": true, "message": "Monthly cleanup completed. Purged N expired messages.", "data": { ...result } }`
-
----
-
-### `DELETE /api/messages/:id`
-Delete a specific message and its stored payload. Only the sender or receiver may delete it. **Requires auth.** Rate limited by `generalApiLimiter`.
-
-**Responses**
-- `200` — `{ "success": true, "message": "Message deleted successfully" }`
-- `403` — not authorized to delete this message
-- `404` — message not found
-
----
-
-## Keys
-
-Base path: `/api/keys`
-
-Used to register and retrieve public keys for hybrid (asymmetric + symmetric) encryption between users. All endpoints require authentication and are rate limited by `generalApiLimiter`.
-
-### `POST /api/keys/register`
-Register (or update) the authenticated user's public key.
-
-**Body**
-```json
-{ "publicKey": "string (required)" }
-```
-
-**Responses**
-- `200` — `{ "success": true, "data": { ...keyRecord }, "message": "Key registered for <email>" }`
-- `400` — public key missing
-
----
-
-### `GET /api/keys/:userId`
-Get another user's public key by their user ID.
-
-**Responses**
-- `200` — `{ "success": true, "data": { ...keyRecord } }`
-- `404` — key not found
-
----
-
-### `GET /api/keys/me/current`
-Get the authenticated user's own public key status.
-
-**Responses**
-- `200` — `{ "success": true, "data": { "email", "hasPublicKey": boolean, "publicKey": "string | null" } }`
-- `404` — user not found
-
----
-
-### `DELETE /api/keys/clear`
-Delete the authenticated user's public key (e.g., before generating a new keypair).
-
-**Responses**
-- `200` — `{ "success": true, "message": "Public key deleted. Generate a new one.", "userEmail": "..." }`
-
----
-
-## Users
-
-Base path: `/api/users`
-
-### `GET /api/users/search`
-Search for other users by email (used when selecting a recipient). **Requires auth.** No dedicated rate limiter beyond global middleware.
-
-**Query Parameters**
-| Param | Type | Description |
+| Variable | Default | Description |
 |---|---|---|
-| `q` | string | Email search term (partial match, case-insensitive) |
-| `protection` | string | If `"hybrid"`, ensures each result includes a public key by falling back to the `Key` collection when needed |
+| `PORT` | `5000` | HTTP port |
+| `MONGODB_URI` | `mongodb://127.0.0.1:27017/securesend` | Mongo connection string |
+| `NODE_ENV` | `development` | `production` disables verbose error bodies |
+| `JWT_SECRET` | — | HS256 signing secret, required in production |
+| `REQUEST_LIMIT_MB` | `12` | Max JSON/urlencoded body size |
+| `RESEND_API_KEY` | — | Resend transactional email API key |
+| `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` | — | Fallback SMTP credentials |
+| `MAX_INLINE_MESSAGE_BYTES` | `12582912` (12 MB) | Threshold above which payloads are offloaded to disk |
 
-**Responses**
-- `200` — `{ "success": true, "data": [ { "email": "string", "publicKey": "string | null" }, ... ] }` (max 8 results, current user excluded)
+Create a `.env` file at `backend-node/.env` with these values before running locally.
 
 ---
 
-## Anonymous Messaging
+### 9. Running Locally
 
-Base path: `/api/anonymous`
+```bash
+cd backend-node
+npm install
 
-Lets a user generate a disposable email alias (e.g. `random-word@securesend.co.in`) and send/receive anonymous emails without revealing their real address.
-
-### `POST /api/anonymous/send`
-Send an anonymous email using a valid alias. **Public.** Rate limited by `sendAnonymousEmailLimiter`.
-
-**Body**
-```json
-{
-  "to": "recipient@example.com (or another securesend.co.in alias)",
-  "subject": "string (required)",
-  "message": "string (required)",
-  "alias": "string (required — the sender's active alias, with or without domain)",
-  "attachments": "optional, passed through to the mail service"
-}
+# create .env with at least MONGODB_URI and JWT_SECRET
+npm run dev      # nodemon, auto-restart
+# or
+npm start        # plain node
 ```
 
-Behavior:
-- The sender's `alias` must be currently active and unexpired.
-- If `to` is a `@securesend.co.in` alias, the recipient's real email is resolved internally (if that alias is invalid/expired, the request is rejected).
-- Otherwise `to` must be a valid email address.
-- The message is persisted so it can be shown in the recipient/sender's anonymous inbox.
+The server connects to MongoDB, starts the monthly cleanup cron (`startMonthlyCleanupCron`), then listens on `PORT` (default `5000`). All routes are prefixed with `/api` except `mail.routes.js`, which is mounted at the application root.
 
-**Responses**
-- `200` — `{ "success": true, "message": "Anonymous message sent successfully.", "provider": "...", "data": { ... } }`
-- `400` — missing required fields, invalid sender alias, invalid/expired recipient alias, or invalid recipient email
+#### CORS
+
+Allowed origins are hard-coded in `app.js`: `localhost` (any port), `127.0.0.1` (any port), the production domains (`securesend.co.in` and subdomains), plus any `*.vercel.app`, `*.pages.dev`, or `*.workers.dev` preview subdomain.
 
 ---
 
-### `POST /api/anonymous/generate-alias`
-Generate a new alias, or return the user's existing active alias. **Requires auth.** Rate limited by `generalApiLimiter`.
+### 10. Error Handling
 
-**Body**
-```json
-{ "force": false }
-```
-Set `force: true` to deactivate the current alias and generate a brand new one.
+All errors funnel through the global error middleware in `app.js`, which normalizes common cases:
 
-**Responses**
-- `200` — existing active alias returned: `{ "success": true, "data": { "alias", "createdAt", "expiresAt" } }`
-- `201` — new alias generated: `{ "success": true, "message": "Alias generated successfully.", "data": { "alias", "createdAt", "expiresAt" } }`
-- `404` — user not found
-
----
-
-### `GET /api/anonymous/inbox`
-Get all anonymous messages sent to or from any alias owned by the authenticated user. **Requires auth.** Rate limited by `generalApiLimiter`.
-
-**Responses**
-- `200` — `{ "success": true, "data": [ { ...anonymousMessage, "isSent": boolean }, ... ] }` (sorted newest first)
-- `404` — user not found
-
----
-
-### `POST /api/anonymous/mark-read/:id`
-Mark an anonymous message as read. Only accessible to the message's sender (via alias) or recipient. **Requires auth.** Rate limited by `generalApiLimiter`.
-
-**Responses**
-- `200` — `{ "success": true, "message": "Message marked as read." }`
-- `403` — access denied (not sender or recipient)
-- `404` — user or message not found
-
----
-
-## Mail
-
-Mounted at the application root (no `/api` prefix).
-
-### `POST /send-email`
-Send a transactional email through the configured mail provider. **Requires auth.**
-
-**Body**
-```json
-{
-  "to": "recipient@example.com",
-  "subject": "string",
-  "message": "string"
-}
-```
-
-**Responses**
-- `200` — `{ "success": true, "data": { ...providerResponse } }`
-- Error status from provider (default `500`) — `{ "success": false, "error": "message" }`
-
----
-
-## Error Handling
-
-Unhandled errors are normalized by a global error middleware and returned as:
-
-```json
-{
-  "success": false,
-  "message": "Human-readable message",
-  "error": "raw error message (non-production only)",
-  "details": "optional debug details (non-production only)"
-}
-```
-
-Common cases handled explicitly:
 | Condition | Status |
 |---|---|
-| Payload too large (over request size limit) | `413` |
-| Malformed request body | `400` |
-| Validation error | `400` |
-| Invalid ID / cast error | `400` |
-| Duplicate record | `409` |
-| Unspecified error | `500` (or `err.status` if set) |
+| Payload too large | `413` |
+| Malformed JSON body | `400` |
+| Mongoose `ValidationError` | `400` |
+| Mongoose `CastError` (bad ObjectId) | `400` |
+| Duplicate key (`E11000`) | `409` |
+| Unhandled | `500` (or `err.status`) |
 
-## Request Size Limit
+In non-production environments, the response also includes `error` (raw message) and `details` (debug payload) fields.
 
-JSON and URL-encoded request bodies are limited to `REQUEST_LIMIT_MB` (default `12` MB).
+
+---
+
+# Part 3 — Java Backend
+
+## SecureSend — Java (Spring Boot) Backend
+
+Spring Boot 3.3 / Java 21 implementation of the SecureSend API. This is a **1:1 functional port** of `backend-node` (Express + Mongoose) onto Spring Boot + Spring Data MongoDB — same routes, same MongoDB collections/shape, same JWT contract, same response envelope. Either backend can serve the `frontend` app interchangeably; the production deployment (`clarity-connect-1.onrender.com`) currently runs this Java backend.
+
+> SecureSend lets users exchange end-to-end encrypted text/image/voice/file messages, send anonymous emails through disposable aliases, and manage public keys for hybrid (RSA + AES) encryption. The server **never sees plaintext** — all encryption/decryption happens in the browser (see `frontend/src/components/securesend/crypto.ts`).
+
+---
+
+### 1. Tech Stack
+
+| Layer | Technology |
+|---|---|
+| Language / runtime | Java 21 |
+| Framework | Spring Boot 3.3.2 |
+| Web | Spring Web (MVC, servlet stack) |
+| Database | MongoDB via Spring Data MongoDB |
+| Security | Spring Security (stateless, custom JWT filter) |
+| JWT | `jjwt` 0.12.6 (api/impl/jackson) |
+| Password hashing | `BCryptPasswordEncoder` (12 rounds) |
+| Email | Spring Mail (SMTP) + Resend HTTP API |
+| Build | Maven (`pom.xml`), Java 21 toolchain |
+| Container | Multi-stage Docker build → `eclipse-temurin:21-jre-alpine` |
+
+---
+
+### 2. Project Structure
+
+```
+backend-java/
+├── src/main/java/com/securesend/
+│   ├── SecuresendApplication.java     # @SpringBootApplication entry point
+│   ├── config/
+│   │   ├── SecurityConfig.java        # Filter chain, permitAll routes, stateless sessions
+│   │   └── CorsConfig.java            # CORS allow-list (see §9)
+│   ├── security/
+│   │   ├── JwtTokenProvider.java      # Sign/verify HS256 tokens, 7-day expiry
+│   │   ├── JwtAuthenticationFilter.java
+│   │   └── UserPrincipal.java
+│   ├── model/                         # MongoDB documents (@Document) — see §4
+│   ├── dto/                           # Request/response DTOs (AuthRequests, MessageRequests, KeyRequests, AnonymousRequests, ApiResponse)
+│   ├── repository/                    # Spring Data MongoRepository interfaces
+│   ├── service/                       # Business logic (Auth, Message, Key, Alias, Anonymous, Mail, Cleanup, PayloadStorage, User)
+│   ├── controller/                    # @RestController per resource
+│   └── exception/
+│       ├── ApiException.java          # Domain exception carrying an HTTP status
+│       └── GlobalExceptionHandler.java# @RestControllerAdvice — normalizes all errors
+├── src/main/resources/application.yml
+├── pom.xml
+└── Dockerfile
+```
+
+---
+
+### 3. Architecture
+
+```mermaid
+flowchart TB
+    subgraph Client["Frontend (React / TanStack Start)"]
+        UI[Browser UI]
+        WC[Web Crypto API<br/>AES-GCM + RSA-OAEP]
+    end
+
+    subgraph API["backend-java (Spring Boot)"]
+        CORS[CorsConfig]
+        SEC[SecurityConfig<br/>stateless session + permitAll routes]
+        JWTF[JwtAuthenticationFilter]
+        C1[AuthController]
+        C2[MessageController]
+        C3[KeyController]
+        C4[UserController]
+        C5[AnonymousController]
+        C6[MailController]
+        SVC[Service layer]
+        GEH[GlobalExceptionHandler]
+    end
+
+    subgraph Data["Persistence"]
+        MDB[(MongoDB)]
+        FS[(Local disk<br/>storage/messages<br/>large payload offload)]
+    end
+
+    subgraph External["External services"]
+        SMTP[Spring Mail / Resend]
+    end
+
+    UI -- plaintext, only in-browser --> WC
+    WC -- ciphertext only --> UI
+    UI -- HTTPS + Bearer JWT --> CORS --> SEC --> JWTF
+    JWTF --> C1 & C2 & C3 & C4 & C5 & C6
+    C1 & C2 & C3 & C4 & C5 & C6 --> SVC
+    SVC --> MDB
+    SVC --> FS
+    SVC --> SMTP
+    SVC -.-> GEH
+```
+
+**Key design decisions**
+
+- **Zero-knowledge server**: the API only stores/forwards ciphertext (`encryptedData`, `encryptedAESKey`, `iv`, `salt`). Plaintext and private keys never leave the browser.
+- **Stateless security**: `SecurityConfig` sets `SessionCreationPolicy.STATELESS`, disables CSRF (pure JSON API), and routes every request through `JwtAuthenticationFilter` before the standard `UsernamePasswordAuthenticationFilter`.
+- **Explicit public-route allow-list**: only OTP/login/signup/password-reset, anonymous send, public message GET/view, and the root mail endpoint are `permitAll()` — everything else requires a valid bearer token.
+- **Layered exception handling**: domain logic throws `ApiException(message, HttpStatus)`; `GlobalExceptionHandler` converts these (and framework exceptions like `MaxUploadSizeExceededException`, `BadCredentialsException`, `AccessDeniedException`, `MethodArgumentNotValidException`) into the same `ApiResponse` envelope the Node backend returns, so the frontend doesn't need to know which backend it's talking to.
+- **Large payload offload**: message payloads over `MAX_INLINE_MESSAGE_BYTES` (default 12 MB) are written to `storage/messages` on disk via `PayloadStorageService`, mirroring the Node implementation.
+
+---
+
+### 4. Data Model (MongoDB Documents)
+
+Collections and fields are identical to `backend-node` — both backends read/write the same MongoDB database, so documents created by one are fully readable by the other.
+
+#### `User`
+| Field | Type | Notes |
+|---|---|---|
+| `id` | String (ObjectId) | |
+| `email` | String | unique, lowercase |
+| `passwordHash` | String | BCrypt, 12 rounds |
+| `publicKey` | String \| null | |
+
+#### `Otp`
+| Field | Type | Notes |
+|---|---|---|
+| `email` | String | |
+| `otp` | String | 6-digit code |
+| `createdAt` | Date | 10-minute expiry (checked in `AuthService`) |
+
+#### `Alias`
+| Field | Type | Notes |
+|---|---|---|
+| `alias` | String | unique, `name123@securesend.co.in` |
+| `realEmail` | String | owner's real email |
+| `isActive` | Boolean | |
+| `expiresAt` | Date | 24h lifetime |
+| `createdAt` | Date | |
+
+Aliases are generated from a curated word list (`AliasService.COMPANY_NAMES`) + a random 3-digit suffix, retried up to 5 times on collision.
+
+#### `Message`
+| Field | Type | Notes |
+|---|---|---|
+| `encryptedData` | String | AES-GCM ciphertext (base64) |
+| `encryptedAESKey` | String | RSA-wrapped AES key (base64) |
+| `iv` | String | AES-GCM IV (base64) |
+| `salt`, `keyIv` | String \| null | symmetric/password mode metadata |
+| `encryptionMode` | Enum | `HYBRID` \| `SYMMETRIC` |
+| `kdf`, `kdfIterations`, `aesAlgorithm`, `rsaAlgorithm` | — | crypto metadata |
+| `senderId` / `receiverId` | String → `User.id` | |
+| `type` | Enum | `text` \| `image` \| `voice` \| `file` |
+| `protection` | Enum | `quick` \| `password` \| `key` \| `hybrid` |
+| `password` | String \| null | |
+| `fileUrl` | String \| null | pointer to offloaded payload |
+| `isAnonymous`, `viewOnce` | Boolean | |
+| `expiresAt` | Date \| null | |
+| `views` | Number | |
+| `logs[]` | embedded array | `{ viewedAt, ip, device, userId }` |
+
+#### `Key`
+| Field | Type | Notes |
+|---|---|---|
+| `userId` | String → `User.id` | unique — one primary key per user |
+| `publicKey` | String | |
+
+#### `Log`
+| Field | Type | Notes |
+|---|---|---|
+| `messageId` | String → `Message.id` | |
+| `userId` | String \| null | |
+| `event` | Enum | `created` \| `viewed` \| `decrypted` \| `deleted` \| `failed_attempt` |
+| `ipAddress`, `device` | String | |
+| `status` | Enum | `success` \| `failed` |
+| `details` | String \| null | |
+
+#### `AnonymousMessage`
+| Field | Type | Notes |
+|---|---|---|
+| `to` | String | recipient email or alias |
+| `subject`, `message` | String | |
+| `senderAlias` | String | |
+| `unread` | Boolean | |
+
+#### Entity Relationships
+
+```mermaid
+erDiagram
+    USER ||--o| KEY : "has one"
+    USER ||--o{ ALIAS : "owns"
+    USER ||--o{ MESSAGE : "sends (senderId)"
+    USER ||--o{ MESSAGE : "receives (receiverId)"
+    MESSAGE ||--o{ LOG : "generates"
+    ALIAS ||--o{ ANONYMOUSMESSAGE : "sends/receives via"
+    USER ||--o{ OTP : "requests"
+```
+
+---
+
+### 5. API Reference
+
+Identical contract to `backend-node` — same paths, same JSON envelope, same status codes. Full endpoint documentation lives in the top-level [`README.md`](#-api-reference-full-endpoint-details).
+
+| Resource | Base Path | Auth | Controller |
+|---|---|---|---|
+| Auth | `/api/auth` | Mixed | `AuthController` |
+| Messages | `/api/messages` | Mixed | `MessageController` |
+| Keys | `/api/keys` | Required | `KeyController` |
+| Users | `/api/users` | Required | `UserController` |
+| Anonymous | `/api/anonymous` | Mixed | `AnonymousController` |
+| Mail | `/send-email`, `/api/send-email` | Required | `MailController` |
+
+#### Publicly accessible routes (from `SecurityConfig`)
+
+| Method | Path |
+|---|---|
+| POST | `/api/auth/request-otp` |
+| POST | `/api/auth/verify-otp` |
+| POST | `/api/auth/signup` |
+| POST | `/api/auth/login` |
+| POST | `/api/auth/forgot-password` |
+| POST | `/api/auth/reset-password` |
+| POST | `/api/anonymous/send` |
+| GET | `/api/messages/{id}` |
+| POST | `/api/messages/{id}/view` |
+| POST/GET | `/send-email`, `/api/send-email` |
+
+All other endpoints require `Authorization: Bearer <jwt>` and are rejected with `401` otherwise.
+
+#### Standard response envelope (`ApiResponse<T>`)
+
+```json
+// success
+{ "success": true, "data": { }, "message": "optional" }
+
+// error
+{ "success": false, "message": "Description of what went wrong" }
+```
+
+---
+
+### 6. Security Configuration
+
+```mermaid
+flowchart LR
+    A[Incoming request] --> B[CorsConfigurationSource]
+    B --> C{Matches public path?}
+    C -- yes --> D[Controller — no auth required]
+    C -- no --> E[JwtAuthenticationFilter]
+    E --> F{Valid Bearer JWT?}
+    F -- yes --> G[SecurityContext populated with UserPrincipal]
+    G --> D2[Controller]
+    F -- no --> H[401 Unauthorized]
+```
+
+- **Password encoding**: `BCryptPasswordEncoder(12)`.
+- **Token signing**: HMAC-SHA256 via `jjwt`, key padded to ≥32 bytes from `securesend.jwt.secret`.
+- **Token lifetime**: `securesend.jwt.expiration-ms` = `604800000` (7 days).
+- **CSRF**: disabled (stateless JSON API, no cookies used for auth).
+
+---
+
+### 7. End-to-End Flows
+
+#### 7.1 Signup / Login
+
+```mermaid
+sequenceDiagram
+    participant B as Browser
+    participant API as backend-java
+    participant M as MongoDB
+    participant E as Mail (SMTP/Resend)
+
+    B->>API: POST /api/auth/request-otp {email}
+    API->>M: save Otp document
+    API->>E: send OTP email
+    B->>API: POST /api/auth/verify-otp {email, otp}
+    API->>M: validate against stored Otp (10 min window)
+    API-->>B: 200 verified
+    B->>API: POST /api/auth/signup {email, password}
+    API->>API: AuthService.getPasswordMissingList() policy check
+    API->>M: save User (BCrypt hash)
+    API->>API: JwtTokenProvider.generateToken(userId)
+    API-->>B: 201 {token, user}
+```
+
+#### 7.2 Sending an End-to-End Encrypted Message (Hybrid)
+
+```mermaid
+sequenceDiagram
+    participant S as Sender (browser)
+    participant API as backend-java
+    participant M as MongoDB
+    participant R as Recipient (browser)
+
+    S->>API: GET /api/keys/{userId}
+    API->>M: KeyRepository.findByUserId
+    API-->>S: publicKey (RSA-OAEP)
+    S->>S: generate AES-256 key, encrypt message (AES-GCM)
+    S->>S: wrap AES key with recipient RSA pubkey
+    S->>API: POST /api/messages {encryptedData, encryptedAESKey, iv, ...}
+    API->>M: MessageService persists Message document
+    API-->>S: 201 {message}
+    R->>API: GET /api/messages/inbox (JWT)
+    API->>M: query by receiverId; wipe payload fields if expired
+    API-->>R: messages[]
+    R->>R: unwrap AES key with private RSA key, decrypt locally
+    R->>API: POST /api/messages/{id}/view
+    API->>M: append Log embed, increment views, wipe payload if viewOnce
+```
+
+#### 7.3 Anonymous Email via Disposable Alias
+
+```mermaid
+sequenceDiagram
+    participant U as Authenticated User
+    participant API as backend-java
+    participant M as MongoDB
+    participant E as Mail (SMTP/Resend)
+    participant T as Third-party recipient
+
+    U->>API: POST /api/anonymous/generate-alias {force:false}
+    API->>M: AliasService — find active alias, else generate new (retry up to 5x on collision)
+    API-->>U: {alias, expiresAt} (TTL 24h)
+    U->>API: POST /api/anonymous/send {to, subject, message, alias}
+    API->>M: validate alias active/unexpired, resolve alias->realEmail if "to" is internal
+    API->>M: persist AnonymousMessage
+    API->>E: dispatch via configured provider
+    E-->>T: email delivered, real identity hidden
+```
+
+#### 7.4 Error Normalization
+
+```mermaid
+flowchart LR
+    A[ApiException / framework exception] --> B[GlobalExceptionHandler]
+    B -->|ApiException| C[status from exception, ApiResponse.error]
+    B -->|MaxUploadSizeExceededException| D[413]
+    B -->|BadCredentialsException| E[401]
+    B -->|AccessDeniedException| F[403]
+    B -->|MethodArgumentNotValidException| G[400, field errors]
+    C & D & E & F & G --> H[Uniform ApiResponse JSON to client]
+```
+
+---
+
+### 8. Configuration (`application.yml`)
+
+| Property | Env Var | Default | Description |
+|---|---|---|---|
+| `server.port` | `PORT` | `5000` | HTTP port |
+| `spring.data.mongodb.uri` | `MONGODB_URI` | `mongodb://127.0.0.1:27017/securesend` | Mongo connection |
+| `spring.servlet.multipart.max-file-size` | `MAX_FILE_SIZE` | `50MB` | Upload cap |
+| `spring.servlet.multipart.max-request-size` | `MAX_REQUEST_SIZE` | `50MB` | Upload cap |
+| `spring.mail.host` / `port` / `username` / `password` | `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` | `smtp.gmail.com:587` | SMTP fallback |
+| `securesend.jwt.secret` | `JWT_SECRET` | (dev placeholder — **override in prod**) | HS256 signing key |
+| `securesend.jwt.expiration-ms` | — | `604800000` (7 days) | Token lifetime |
+| `securesend.resend.api-key` | `RESEND_API_KEY` | — | Resend API key |
+| `securesend.resend.from` | `RESEND_FROM` | `SecureSend <noreply@securesend.co.in>` | From address |
+| `securesend.email.auth-provider` | `AUTH_EMAIL_PROVIDER` | `resend` | Provider used for OTP/auth email |
+| `securesend.email.anon-provider` | `ANON_EMAIL_PROVIDER` | `resend` | Provider used for anonymous email |
+| `securesend.storage.max-inline-bytes` | `MAX_INLINE_MESSAGE_BYTES` | `12582912` (12 MB) | Offload threshold |
+| `securesend.storage.payload-path` | — | `storage/messages` | Disk path for offloaded payloads |
+
+---
+
+### 9. CORS
+
+Configured in `CorsConfig.java` via `setAllowedOriginPatterns`:
+
+- `http://localhost:*`, `http://127.0.0.1:*` (any port, local dev)
+- `https://*.onrender.com`, `https://*.vercel.app`, `https://*.pages.dev`, `https://*.workers.dev` (preview/production deploys)
+- `https://securesend.co.in`, `https://www.securesend.co.in`, `https://message.securesend.co.in`, `https://www.message.securesend.co.in`
+
+Allowed methods: `GET, POST, PUT, PATCH, DELETE, OPTIONS`. Allowed headers: `Authorization, Cache-Control, Content-Type, X-Requested-With`. Credentials allowed, `maxAge` 3600s.
+
+---
+
+### 10. Running Locally
+
+**Requirements**: JDK 21, Maven 3.9+, a running MongoDB instance.
+
+```bash
+cd backend-java
+
+# set env vars (or edit application.yml directly)
+export MONGODB_URI=mongodb://127.0.0.1:27017/securesend
+export JWT_SECRET=change_me_to_a_long_random_secret
+export RESEND_API_KEY=...        # optional, only needed for real email delivery
+
+./mvnw spring-boot:run
+# Windows: mvnw.cmd spring-boot:run
+```
+
+Or build a jar directly:
+
+```bash
+./mvnw clean package -DskipTests
+java -jar target/securesend-backend-1.0.0.jar
+```
+
+#### Docker
+
+```bash
+docker build -t securesend-backend-java .
+docker run -p 5000:5000 \
+  -e MONGODB_URI=mongodb://host.docker.internal:27017/securesend \
+  -e JWT_SECRET=change_me \
+  securesend-backend-java
+```
+
+The `Dockerfile` is a two-stage build: `maven:3.9-eclipse-temurin-21-alpine` compiles the jar, then `eclipse-temurin:21-jre-alpine` runs it, exposing port `5000`.
+
+---
+
+### 11. Interop Notes (vs. `backend-node`)
+
+| Aspect | backend-node | backend-java |
+|---|---|---|
+| Response envelope | `{ success, data, message }` | Same, via `ApiResponse<T>` |
+| Password hashing | bcryptjs, 12 rounds | Spring `BCryptPasswordEncoder(12)` |
+| JWT algorithm | HS256 | HS256 |
+| MongoDB collections | Mongoose models | Spring Data `@Document`s, same field names/case |
+| Rate limiting | `express-rate-limit` middleware, per-route named limiters | Not yet ported — mirror manually if switching production traffic to Java under load |
+| Large payload offload | `utils/payloadStorage.js` → `storage/messages` | `PayloadStorageService` → same relative path |
+
+Because both backends share the same MongoDB schema, you can point the frontend at either one (see `frontend/src/lib/api.ts` — defaults to the Java backend in production, `http://localhost:5000/api` in dev) without a data migration.
+
+
+---
+
+# Part 4 — Frontend
+
+## SecureSend — Frontend
+
+React 19 single-page app for SecureSend, built with **TanStack Start / TanStack Router**, **Vite 7**, **Tailwind CSS 4**, and **shadcn/ui** (Radix primitives). All encryption/decryption happens client-side using the browser's **Web Crypto API** — the backend (either `backend-node` or `backend-java`) never receives plaintext.
+
+---
+
+### 1. Tech Stack
+
+| Concern | Library |
+|---|---|
+| UI framework | React 19 |
+| Routing / app shell | `@tanstack/react-router`, `@tanstack/react-start` (file-based routes) |
+| Data fetching | `axios` (thin client in `src/lib/api.ts`); `@tanstack/react-query` available |
+| Styling | Tailwind CSS 4, `tailwind-merge`, `class-variance-authority` |
+| Component kit | shadcn/ui (Radix UI primitives) — `src/components/ui/*` |
+| Forms | `react-hook-form` + `zod` + `@hookform/resolvers` |
+| Animation | `framer-motion` |
+| Icons | `lucide-react` |
+| Toasts | `sonner` |
+| Cryptography | Native Web Crypto API (`crypto.subtle`) — no external crypto library |
+| Build tool | Vite 7, `@vitejs/plugin-react`, `vite-tsconfig-paths` |
+| Deployment target | Cloudflare Workers (`@cloudflare/vite-plugin`, `wrangler.jsonc`) |
+| Lint / format | ESLint 9 (flat config) + Prettier |
+
+---
+
+### 2. Project Structure
+
+```
+frontend/
+├── src/
+│   ├── routes/                      # File-based routes (TanStack Router)
+│   │   ├── __root.tsx               # Root layout, 404 page, global <head>
+│   │   ├── landing.tsx              # Marketing/landing page
+│   │   ├── login.tsx                # Login + OTP-based password reset
+│   │   ├── signup.tsx                # Signup with OTP email verification
+│   │   ├── index.tsx                 # "/" — main authenticated app shell
+│   │   ├── anonymous.tsx             # Disposable alias inbox/compose
+│   │   └── m.$messageId.tsx          # Public shared-message viewer ("/m/:messageId")
+│   ├── routeTree.gen.ts             # Auto-generated by the TanStack Router plugin
+│   ├── router.tsx                   # createRouter() + global error boundary
+│   ├── components/
+│   │   ├── ui/                      # shadcn/ui primitives (button, dialog, table, ...)
+│   │   └── securesend/              # App-specific components (see §5)
+│   ├── lib/
+│   │   ├── api.ts                   # axios instance, base URL resolution, JWT interceptor
+│   │   └── utils.ts                 # `cn()` classname helper
+│   ├── hooks/
+│   │   └── use-mobile.tsx
+│   └── styles.css                   # Tailwind entry + design tokens
+├── public/                          # favicons, manifest, sitemap, robots.txt
+├── vite.config.ts
+├── wrangler.jsonc                   # Cloudflare Workers deployment config
+├── components.json                  # shadcn/ui config
+└── package.json
+```
+
+---
+
+### 3. Architecture
+
+```mermaid
+flowchart TB
+    subgraph Browser
+        R[TanStack Router<br/>file-based routes]
+        C[UI Components<br/>securesend/*, ui/*]
+        CR[crypto.ts<br/>Web Crypto API]
+        LS[(localStorage<br/>JWT + RSA keypair)]
+        API[axios client<br/>lib/api.ts]
+    end
+
+    subgraph Edge["Deployment (Cloudflare Workers)"]
+        SSR[TanStack Start server entry]
+    end
+
+    subgraph Backend["Either backend"]
+        NODE[backend-node :5000]
+        JAVA[backend-java :5000]
+    end
+
+    R --> C
+    C --> CR
+    CR <--> LS
+    C -- ciphertext + metadata only --> API
+    API -- Bearer JWT --> NODE
+    API -- Bearer JWT --> JAVA
+    SSR --> R
+```
+
+**Key design decisions**
+
+- **File-based routing**: every file in `src/routes/` becomes a route; `routeTree.gen.ts` is generated by the TanStack Router Vite plugin — don't hand-edit it.
+- **Client-side auth guard**: routes like `login`, `signup`, `anonymous`, and `index` use `beforeLoad` to check `localStorage.getItem("isLoggedIn")` and `redirect()` accordingly (see §6).
+- **Backend-agnostic API client**: `src/lib/api.ts` resolves its base URL from `VITE_API_URL` / `VITE_API_BASE_URL` / `VITE_BACKEND_URL`, falling back to `http://localhost:5000/api` in dev and the Java backend's Render URL in production. Switching backends requires no frontend code changes.
+- **Zero-trust encryption**: all AES/RSA key generation, wrapping, encryption, and decryption happens in `crypto.ts` inside the browser using `crypto.subtle`. Private keys are generated with the browser's Web Crypto API and persisted only in `localStorage` on the user's device — never transmitted.
+- **Public share links**: `/m/$messageId` is a route that works without authentication so a message link can be shared with someone who doesn't have (or doesn't need) an account — decryption still happens locally using a password/key the recipient supplies out-of-band.
+
+---
+
+### 4. Environment Variables
+
+| Variable | Purpose | Dev default | Prod default |
+|---|---|---|---|
+| `VITE_API_URL` / `VITE_API_BASE_URL` / `VITE_BACKEND_URL` | Backend base URL (first one set wins) | `http://localhost:5000/api` | `https://clarity-connect-1.onrender.com/api` |
+
+Set one of these in a `.env` (or `.env.local`) file at the frontend root, or via your deployment platform's environment settings, to point at `backend-node` or `backend-java` explicitly.
+
+---
+
+### 5. Feature Components (`src/components/securesend/`)
+
+| Component | Responsibility |
+|---|---|
+| `Sidebar.tsx` | Folder navigation (Inbox / Sent / Expired / Access Logs), compose button, logout (clears JWT + RSA keys) |
+| `ComposeModal.tsx` | Message composer — text/voice/file, protection mode (quick/password/key/hybrid), expiry, view-once, drives the encrypt-then-send flow |
+| `MessageList.tsx` | List view per folder |
+| `MessageDetail.tsx` | Decrypts and renders a selected message |
+| `SharePanel.tsx` | Generates/copies the public share link for a message |
+| `AccessLogs.tsx` | Renders per-message view logs (IP, device, timestamp) |
+| `CircularTimer.tsx` | Countdown UI for expiring/view-once messages |
+| `VoicePlayer.tsx` | Playback UI for decrypted voice messages |
+| `HybridSteps.tsx` | Visual step-by-step of the hybrid encryption process (educational UI) |
+| `TemplateLibrary.tsx` / `templates.ts` | Prewritten templates for anonymous emails |
+| `EmailPreview.tsx` | Preview pane for anonymous email compose |
+| `UserSearch.tsx` | Recipient lookup against `GET /api/users/search` |
+| `crypto.ts` | Core cryptography module (see §7) |
+| `mockData.ts` | Local sample data for offline/demo UI states |
+| `utils.ts` | Formatting helpers (e.g. `timeAgo`) |
+| `types.ts` | Shared TypeScript types (`SecureMessage`, `EncryptedPayload`, `Folder`, `ProtectionMode`, `AccessLog`) |
+
+#### Core domain types
+
+| Type | Values / Shape |
+|---|---|
+| `MessageType` | `"text" \| "voice" \| "file"` |
+| `Folder` | `"inbox" \| "sent" \| "expired" \| "logs"` |
+| `ProtectionMode` | `"quick" \| "password" \| "key" \| "hybrid"` |
+| `EncryptedPayload` | `{ encryptedData, encryptedAESKey, iv, salt?, keyIv?, encryptionMode?, kdf?, kdfIterations?, aesAlgorithm?, rsaAlgorithm?, mode?, receiver? }` |
+| `AccessLog` | `{ viewedAt, ip, device, viewer? }` |
+
+---
+
+### 6. Routes
+
+| Route | File | Auth Guard | Purpose |
+|---|---|---|---|
+| `/landing` | `landing.tsx` | redirects away if already logged in | Marketing page, feature highlights, CTA to signup/login |
+| `/login` | `login.tsx` | redirects to `/` if already logged in | Email + password login, forgot-password OTP flow |
+| `/signup` | `signup.tsx` | redirects to `/` if already logged in | OTP-verified signup, password policy enforcement |
+| `/` | `index.tsx` | requires `isLoggedIn` | Main app shell — Sidebar + MessageList + MessageDetail + ComposeModal |
+| `/anonymous` | `anonymous.tsx` | requires `isLoggedIn` | Disposable alias generation, anonymous inbox, anonymous compose |
+| `/m/$messageId` | `m.$messageId.tsx` | none (public) | Standalone shared-message viewer for a single message link |
+| `*` (unmatched) | `__root.tsx` | — | 404 page |
+
+Auth state is derived from two `localStorage` keys: `isLoggedIn` (`"true"`/absent) and `token` (JWT, attached to every request by the axios interceptor in `lib/api.ts`).
+
+---
+
+### 7. Cryptography (`src/components/securesend/crypto.ts`)
+
+All done with `crypto.subtle`, entirely in-browser:
+
+| Primitive | Algorithm |
+|---|---|
+| Symmetric message encryption | AES-GCM, 256-bit key, 12-byte random IV |
+| Key wrapping (hybrid mode) | RSA-OAEP, 2048-bit, SHA-256 |
+| Password/key-derivation mode | PBKDF2 → derives an AES key from a shared secret + salt |
+
+| Function | Purpose |
+|---|---|
+| `generateAESKey()` | Fresh, extractable AES-GCM 256 key |
+| `encryptMessage()` / `decryptMessage()` | AES-GCM encrypt/decrypt a string |
+| `encryptAESKey()` / `decryptAESKey()` | Wrap/unwrap the AES key with an RSA-OAEP public/private key |
+| `hybridEncrypt()` / `hybridDecrypt()` | Full hybrid flow: generate AES key → encrypt payload → wrap AES key with recipient's RSA public key |
+| `loadOrCreateRSAKeyPair()` | Persists a per-user RSA keypair in `localStorage` (generated once per browser) |
+| `importPublicKey()` | Imports a base64 RSA public key fetched from the backend (`GET /api/keys/:userId`) |
+| `clearStoredRSAKeys()` | Wipes local keypair on logout |
+
+**Nothing here ever calls the backend with plaintext.** The backend only ever receives/returns `encryptedData`, `encryptedAESKey`, `iv`, and metadata (`salt`, `kdf`, algorithm identifiers).
+
+---
+
+### 8. End-to-End Flows
+
+#### 8.1 Signup
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant FE as Frontend (signup.tsx)
+    participant API as Backend
+
+    U->>FE: enters email
+    FE->>API: POST /api/auth/request-otp
+    API-->>U: OTP email
+    U->>FE: enters OTP
+    FE->>API: POST /api/auth/verify-otp
+    API-->>FE: 200 verified
+    U->>FE: sets password (policy validated client + server)
+    FE->>API: POST /api/auth/signup
+    API-->>FE: 201 {token, user}
+    FE->>FE: localStorage.setItem("token", ...), ("isLoggedIn","true")
+    FE->>FE: redirect to "/"
+```
+
+#### 8.2 Composing and Sending a Hybrid-Encrypted Message
+
+```mermaid
+sequenceDiagram
+    participant U as Sender
+    participant CM as ComposeModal
+    participant CR as crypto.ts
+    participant API as Backend
+
+    U->>CM: writes message, picks recipient, protection=hybrid, expiry, view-once
+    CM->>API: GET /api/users/search?q=&protection=hybrid (recipient lookup incl. public key)
+    CM->>API: GET /api/keys/:userId (if not already resolved)
+    CM->>CR: importPublicKey(recipientPublicKey)
+    CM->>CR: hybridEncrypt(plaintext, publicKey)
+    CR-->>CM: {encryptedData, encryptedAESKey, iv}
+    CM->>API: POST /api/messages {encryptedData, encryptedAESKey, iv, type, protection, expiresIn, viewOnce, ...}
+    API-->>CM: 201 {message}
+    CM-->>U: toast "Message sent" + optional share link (SharePanel)
+```
+
+#### 8.3 Reading and Decrypting a Message
+
+```mermaid
+sequenceDiagram
+    participant U as Recipient
+    participant FE as MessageList / MessageDetail
+    participant CR as crypto.ts
+    participant API as Backend
+
+    U->>FE: opens Inbox
+    FE->>API: GET /api/messages/inbox (JWT)
+    API-->>FE: messages[] (still ciphertext)
+    U->>FE: selects a message
+    FE->>CR: decryptAESKey(encryptedAESKey, ownPrivateKey)
+    CR->>CR: decryptMessage(encryptedData, aesKey, iv)
+    CR-->>FE: plaintext
+    FE->>API: POST /api/messages/:id/view (logs view; wipes payload server-side if viewOnce)
+    FE-->>U: renders decrypted content (text/voice/file)
+```
+
+#### 8.4 Anonymous Email
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant FE as anonymous.tsx
+    participant API as Backend
+    participant T as Third-party recipient
+
+    U->>FE: clicks "Generate alias"
+    FE->>API: POST /api/anonymous/generate-alias
+    API-->>FE: {alias, expiresAt} (24h TTL)
+    U->>FE: composes email (TemplateLibrary / EmailPreview)
+    FE->>API: POST /api/anonymous/send {to, subject, message, alias}
+    API-->>T: email delivered from alias, real identity hidden
+    FE->>API: GET /api/anonymous/inbox
+    API-->>FE: thread of sent/received anonymous messages
+```
+
+#### 8.5 Public Shared Link
+
+```mermaid
+sequenceDiagram
+    participant V as Anyone with the link
+    participant FE as m.$messageId.tsx
+    participant API as Backend
+
+    V->>FE: opens /m/:messageId
+    FE->>API: GET /api/messages/:id (public)
+    API-->>FE: ciphertext + metadata (no password field)
+    FE->>V: prompts for password/key if protection requires it
+    FE->>FE: decrypts locally via crypto.ts
+    FE->>API: POST /api/messages/:id/view
+    FE-->>V: renders plaintext (once, if viewOnce)
+```
+
+---
+
+### 9. Running Locally
+
+```bash
+cd frontend
+npm install   # or bun install — bunfig.toml is present
+
+# point at a running backend (Node on :5000 by default in dev)
+npm run dev
+```
+
+Vite dev server starts (default `http://localhost:5173`). Make sure `backend-node` or `backend-java` is running on port `5000`, or set `VITE_API_URL` to a different backend URL.
+
+#### Build & Preview
+
+```bash
+npm run build      # production build (Cloudflare-targeted, via @tanstack/react-start + @cloudflare/vite-plugin)
+npm run preview    # preview the production build locally
+```
+
+#### Lint / Format
+
+```bash
+npm run lint
+npm run format
+```
+
+#### Deployment
+
+The app is configured for **Cloudflare Workers** (`wrangler.jsonc`, entry `@tanstack/react-start/server-entry`), and CORS on both backends already allow `*.pages.dev` / `*.workers.dev` preview subdomains as well as `*.vercel.app` — so it can also be deployed to Vercel without config changes. Set the appropriate `VITE_API_URL` for whichever backend deployment (Node or Java) the frontend should call.
+
+---
+
+### 10. Design System
+
+Built on **shadcn/ui** (`components.json` configures the CLI) with Tailwind CSS 4 design tokens defined in `src/styles.css`. All Radix-based primitives live under `src/components/ui/` (accordion, dialog, dropdown-menu, sidebar, table, tabs, toast/sonner, etc.) and are composed into the SecureSend-specific components under `src/components/securesend/`.
