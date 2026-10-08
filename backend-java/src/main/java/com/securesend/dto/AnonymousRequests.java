@@ -35,6 +35,7 @@ public class AnonymousRequests {
     @Data
     public static class SendAnonymousRequest {
         private String to;
+        private List<String> recipients;
         private String subject;
         private String message;
         private String alias;

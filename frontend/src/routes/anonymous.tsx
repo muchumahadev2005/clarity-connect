@@ -200,7 +200,7 @@ function AnonymousMail() {
 
     setSending(true);
     try {
-      await api.post("/anonymous/send", {
+      const res = await api.post("/anonymous/send", {
         to: to.trim(),
         subject: subject.trim(),
         message: finalMessage,
@@ -208,9 +208,15 @@ function AnonymousMail() {
         attachments: attachment ? [attachment] : undefined,
       });
 
-      toast.success("Sent anonymously 🎭", {
-        description: "The email was delivered through SecureSend.",
-      });
+      const recipientCount = res.data?.data?.totalRecipients || 1;
+      toast.success(
+        recipientCount > 1
+          ? `Sent anonymously to ${recipientCount} recipients 🎭`
+          : "Sent anonymously 🎭",
+        {
+          description: "Delivered securely through SecureSend.",
+        },
+      );
       setTo("");
       setSubject("");
       setHeader("");
@@ -628,13 +634,19 @@ function Compose({
             </div>
 
             <div className="space-y-3">
-              <Field label="To">
-                <input
-                  type="email"
+              <Field
+                label={`To ${
+                  to && (to.includes(",") || to.includes("\n") || to.includes(";"))
+                    ? `(${to.split(/[,;\r\n]+/).filter(Boolean).length} recipients)`
+                    : ""
+                }`}
+              >
+                <textarea
+                  rows={to.includes("\n") || to.length > 60 ? 3 : 1}
                   value={to}
                   onChange={(e) => onTo(e.target.value)}
-                  placeholder="recipient@example.com"
-                  className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+                  placeholder="recipient@example.com (or paste comma/newline separated emails up to 1,400 members)"
+                  className="w-full resize-y bg-transparent text-sm outline-none placeholder:text-muted-foreground font-sans leading-relaxed"
                 />
               </Field>
               <Field label="Subject">

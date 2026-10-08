@@ -5,6 +5,7 @@ import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.stereotype.Repository;
 
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -16,6 +17,8 @@ public interface AliasRepository extends MongoRepository<Alias, String> {
     Optional<Alias> findByAliasIgnoreCase(String alias);
 
     Optional<Alias> findByAliasIgnoreCaseAndIsActiveTrueAndExpiresAtGreaterThan(String alias, Instant now);
+
+    List<Alias> findByAliasInAndIsActiveTrueAndExpiresAtGreaterThan(Collection<String> aliases, Instant now);
 
     List<Alias> findByRealEmailIgnoreCase(String realEmail);
 

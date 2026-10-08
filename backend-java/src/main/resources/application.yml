@@ -9,6 +9,9 @@ server:
 spring:
   application:
     name: securesend-backend
+  threads:
+    virtual:
+      enabled: true
   data:
     mongodb:
       uri: ${MONGODB_URI:mongodb://127.0.0.1:27017/securesend}

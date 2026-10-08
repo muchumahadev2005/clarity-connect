@@ -81,7 +81,23 @@ export function EmailPreview({
             <div>
               <span className="font-semibold text-foreground">To:</span>{" "}
               {to.trim() ? (
-                <span className="text-foreground/90">{to.trim()}</span>
+                (() => {
+                  const recipients = to.split(/[,;\r\n]+/).map((s) => s.trim()).filter(Boolean);
+                  if (recipients.length > 1) {
+                    return (
+                      <span className="text-foreground/90">
+                        <span className="font-medium text-foreground">{recipients[0]}</span>{" "}
+                        <span className="text-muted-foreground">
+                          (+ {recipients.length - 1} other recipients individually)
+                        </span>
+                        <span className="ml-2 inline-flex items-center rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-600">
+                          🔒 Private individual copies
+                        </span>
+                      </span>
+                    );
+                  }
+                  return <span className="text-foreground/90">{to.trim()}</span>;
+                })()
               ) : (
                 <span className="italic text-muted-foreground/70">(No recipient specified)</span>
               )}

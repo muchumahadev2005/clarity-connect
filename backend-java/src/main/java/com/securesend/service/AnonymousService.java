@@ -69,65 +69,140 @@ public class AnonymousService {
                 .build();
     }
 
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(AnonymousService.class);
+
     public ApiResponse<Object> sendAnonymous(SendAnonymousRequest req) {
-        if (req.getTo() == null || req.getSubject() == null || req.getMessage() == null || req.getAlias() == null) {
-            throw new ApiException("Please provide all required fields: to, subject, message, alias.", HttpStatus.BAD_REQUEST);
+        if (req == null || req.getSubject() == null || req.getMessage() == null || req.getAlias() == null) {
+            throw new ApiException("Please provide all required fields: subject, message, alias, and at least one recipient.", HttpStatus.BAD_REQUEST);
         }
 
-        String normalizedTo = req.getTo().trim().toLowerCase();
+        // Collect all recipients from either `recipients` list or `to` string (supports comma, semicolon, newline)
+        Set<String> uniqueRecipients = new LinkedHashSet<>();
+        if (req.getRecipients() != null) {
+            for (String r : req.getRecipients()) {
+                if (r != null && !r.trim().isEmpty()) {
+                    uniqueRecipients.add(r.trim().toLowerCase());
+                }
+            }
+        }
+        if (req.getTo() != null && !req.getTo().isBlank()) {
+            String[] parts = req.getTo().split("[,;\\r\\n]+");
+            for (String part : parts) {
+                String trimmed = part.trim().toLowerCase();
+                if (!trimmed.isEmpty()) {
+                    uniqueRecipients.add(trimmed);
+                }
+            }
+        }
+
+        if (uniqueRecipients.isEmpty()) {
+            throw new ApiException("Please provide at least one recipient email address.", HttpStatus.BAD_REQUEST);
+        }
+
+        if (uniqueRecipients.size() > 2000) {
+            throw new ApiException("Recipient limit exceeded. Maximum 2000 recipients allowed per request.", HttpStatus.BAD_REQUEST);
+        }
+
         String cleanAlias = req.getAlias().trim().toLowerCase();
-
-        String fullSenderAlias = cleanAlias;
-        if (!fullSenderAlias.contains("@")) {
-            fullSenderAlias = fullSenderAlias + "@securesend.co.in";
-        }
+        String fullSenderAlias = cleanAlias.contains("@") ? cleanAlias : cleanAlias + "@securesend.co.in";
 
         AliasService.AliasValidationResult validation = aliasService.validateAlias(fullSenderAlias);
         if (!validation.isValid) {
             throw new ApiException(validation.reason != null ? validation.reason : "Invalid or expired sender alias.", HttpStatus.BAD_REQUEST);
         }
 
-        String recipientRealEmail = normalizedTo;
-        boolean isRecipientAlias = normalizedTo.endsWith("@securesend.co.in");
+        Pattern emailPattern = Pattern.compile("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$");
+        List<String> aliasRecipients = new ArrayList<>();
+        List<String> normalRecipients = new ArrayList<>();
+        List<String> invalidRecipients = new ArrayList<>();
 
-        if (isRecipientAlias) {
-            var recipientAliasOpt = aliasRepository.findByAliasIgnoreCaseAndIsActiveTrueAndExpiresAtGreaterThan(normalizedTo, Instant.now());
-            if (recipientAliasOpt.isEmpty()) {
-                throw new ApiException("Recipient alias is invalid, inactive, or expired.", HttpStatus.BAD_REQUEST);
+        for (String email : uniqueRecipients) {
+            if (email.endsWith("@securesend.co.in")) {
+                aliasRecipients.add(email);
+            } else if (emailPattern.matcher(email).matches()) {
+                normalRecipients.add(email);
+            } else {
+                invalidRecipients.add(email);
             }
-            recipientRealEmail = recipientAliasOpt.get().getRealEmail();
-        } else {
-            Pattern emailPattern = Pattern.compile("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$");
-            if (!emailPattern.matcher(normalizedTo).matches()) {
-                throw new ApiException("Please provide a valid recipient email address.", HttpStatus.BAD_REQUEST);
+        }
+
+        if (uniqueRecipients.size() == 1 && !invalidRecipients.isEmpty()) {
+            throw new ApiException("Please provide a valid recipient email address.", HttpStatus.BAD_REQUEST);
+        }
+
+        Map<String, String> aliasToRealEmail = new HashMap<>();
+        if (!aliasRecipients.isEmpty()) {
+            List<Alias> activeAliases = aliasRepository.findByAliasInAndIsActiveTrueAndExpiresAtGreaterThan(aliasRecipients, Instant.now());
+            for (Alias a : activeAliases) {
+                aliasToRealEmail.put(a.getAlias().toLowerCase(), a.getRealEmail());
             }
+        }
+
+        List<String> deliveryRecipients = new ArrayList<>();
+        List<String> savedTargetEmails = new ArrayList<>();
+
+        for (String email : normalRecipients) {
+            deliveryRecipients.add(email);
+            savedTargetEmails.add(email);
+        }
+
+        for (String aliasEmail : aliasRecipients) {
+            String realEmail = aliasToRealEmail.get(aliasEmail);
+            if (realEmail != null && !realEmail.isBlank()) {
+                deliveryRecipients.add(realEmail);
+                savedTargetEmails.add(aliasEmail);
+            } else {
+                log.warn("Alias recipient is invalid, inactive, or expired: {}", aliasEmail);
+                if (uniqueRecipients.size() == 1) {
+                    throw new ApiException("Recipient alias is invalid, inactive, or expired.", HttpStatus.BAD_REQUEST);
+                }
+            }
+        }
+
+        if (deliveryRecipients.isEmpty()) {
+            throw new ApiException("No valid recipient email addresses available to send.", HttpStatus.BAD_REQUEST);
         }
 
         String prefixAlias = cleanAlias.split("@")[0];
         Map<String, Object> mailResult = mailService.sendAnonymousEmail(
-                recipientRealEmail,
+                deliveryRecipients,
                 req.getSubject().trim(),
                 req.getMessage().trim(),
                 prefixAlias,
                 req.getAttachments()
         );
 
-        AnonymousMessage anonMsg = AnonymousMessage.builder()
-                .to(normalizedTo)
-                .subject(req.getSubject().trim())
-                .message(req.getMessage().trim())
-                .senderAlias(fullSenderAlias)
-                .unread(true)
-                .createdAt(Instant.now())
-                .build();
+        Instant now = Instant.now();
+        String trimmedSubject = req.getSubject().trim();
+        String trimmedMessage = req.getMessage().trim();
+        List<AnonymousMessage> messagesToSave = new ArrayList<>(savedTargetEmails.size());
+        for (String targetEmail : savedTargetEmails) {
+            messagesToSave.add(AnonymousMessage.builder()
+                    .to(targetEmail)
+                    .subject(trimmedSubject)
+                    .message(trimmedMessage)
+                    .senderAlias(fullSenderAlias)
+                    .unread(true)
+                    .createdAt(now)
+                    .build());
+        }
 
-        anonymousMessageRepository.save(anonMsg);
+        anonymousMessageRepository.saveAll(messagesToSave);
+
+        String successMessage = deliveryRecipients.size() == 1
+                ? "Anonymous message sent successfully."
+                : String.format("Anonymous message sent successfully to %d recipients.", deliveryRecipients.size());
 
         return ApiResponse.builder()
                 .success(true)
-                .message("Anonymous message sent successfully.")
+                .message(successMessage)
                 .provider((String) mailResult.get("provider"))
-                .data(mailResult.get("data"))
+                .data(Map.of(
+                        "totalRecipients", deliveryRecipients.size(),
+                        "batchesProcessed", mailResult.getOrDefault("batchCount", 1),
+                        "provider", mailResult.getOrDefault("provider", "resend"),
+                        "invalidRecipientsCount", invalidRecipients.size()
+                ))
                 .build();
     }
 

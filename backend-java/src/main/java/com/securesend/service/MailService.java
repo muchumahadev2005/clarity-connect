@@ -94,10 +94,17 @@ public class MailService {
     }
 
     public Map<String, Object> sendAnonymousEmail(String to, String subject, String content, String alias, List<AttachmentDto> attachments) {
-        String safeTo = to.trim();
-        String safeSubject = subject.trim();
-        String safeContent = content.trim();
-        String safeAlias = alias.trim();
+        return sendAnonymousEmail(List.of(to), subject, content, alias, attachments);
+    }
+
+    public Map<String, Object> sendAnonymousEmail(List<String> recipients, String subject, String content, String alias, List<AttachmentDto> attachments) {
+        if (recipients == null || recipients.isEmpty()) {
+            throw new ApiException("No recipient email addresses provided.", HttpStatus.BAD_REQUEST);
+        }
+
+        String safeSubject = subject != null ? subject.trim() : "New Message";
+        String safeContent = content != null ? content.trim() : "";
+        String safeAlias = alias != null ? alias.trim() : "anonymous";
 
         String customDisplayName = "SecureSend";
         String cleanContent = safeContent;
@@ -110,12 +117,12 @@ public class MailService {
         }
 
         if ("smtp".equalsIgnoreCase(anonProvider) || resendApiKey == null || resendApiKey.isBlank()) {
-            return sendAnonymousEmailViaSmtp(safeTo, safeSubject, cleanContent, safeAlias, customDisplayName, attachments);
+            return sendAnonymousEmailViaSmtp(recipients, safeSubject, cleanContent, safeAlias, customDisplayName, attachments);
         }
-        return sendAnonymousEmailViaResend(safeTo, safeSubject, cleanContent, safeAlias, customDisplayName, attachments);
+        return sendAnonymousEmailViaResend(recipients, safeSubject, cleanContent, safeAlias, customDisplayName, attachments);
     }
 
-    private Map<String, Object> sendAnonymousEmailViaResend(String to, String subject, String content, String alias, String displayName, List<AttachmentDto> attachments) {
+    private Map<String, Object> sendAnonymousEmailViaResend(List<String> recipients, String subject, String content, String alias, String displayName, List<AttachmentDto> attachments) {
         String replyTo = alias + "@securesend.co.in";
         String emailOnly = resendFrom;
         if (resendFrom.contains("<") && resendFrom.contains(">")) {
@@ -136,52 +143,120 @@ public class MailService {
             </div>
             """, safeHtml, replyTo);
 
-        Map<String, Object> body = new HashMap<>();
-        body.put("from", fromHeader);
-        body.put("to", List.of(to));
-        body.put("subject", subject != null && !subject.isBlank() ? subject : "New Message");
-        body.put("reply_to", replyTo);
-        body.put("text", content);
-        body.put("html", htmlContent);
-
+        List<Map<String, String>> resendAtts = null;
         if (attachments != null && !attachments.isEmpty()) {
-            List<Map<String, String>> resendAtts = new ArrayList<>();
+            resendAtts = new ArrayList<>();
             for (AttachmentDto att : attachments) {
                 Map<String, String> a = new HashMap<>();
                 a.put("filename", att.getFilename());
                 a.put("content", att.getContent()); // Base64 content
                 resendAtts.add(a);
             }
-            body.put("attachments", resendAtts);
         }
 
-        Map<String, Object> responseData = sendViaResendHttp(body);
+        // Single recipient - use direct standard endpoint
+        if (recipients.size() == 1) {
+            Map<String, Object> body = new HashMap<>();
+            body.put("from", fromHeader);
+            body.put("to", List.of(recipients.get(0).trim()));
+            body.put("subject", subject != null && !subject.isBlank() ? subject : "New Message");
+            body.put("reply_to", replyTo);
+            body.put("text", content);
+            body.put("html", htmlContent);
+            if (resendAtts != null) {
+                body.put("attachments", resendAtts);
+            }
+
+            Map<String, Object> responseData = sendViaResendHttp(body);
+            Map<String, Object> result = new HashMap<>();
+            result.put("provider", "resend");
+            result.put("totalRecipients", 1);
+            result.put("batchCount", 1);
+            result.put("data", responseData);
+            return result;
+        }
+
+        // Multi-recipient batch send (up to 100 per Resend Batch API call)
+        final int BATCH_SIZE = 100;
+        int totalBatches = (recipients.size() + BATCH_SIZE - 1) / BATCH_SIZE;
+        log.info("[sendAnonymousEmailViaResend] Starting batch send for {} recipients in {} batches", recipients.size(), totalBatches);
+
+        List<Object> allResponses = new ArrayList<>();
+        for (int i = 0; i < recipients.size(); i += BATCH_SIZE) {
+            int end = Math.min(i + BATCH_SIZE, recipients.size());
+            List<String> chunk = recipients.subList(i, end);
+
+            List<Map<String, Object>> batchPayload = new ArrayList<>();
+            for (String rec : chunk) {
+                Map<String, Object> item = new HashMap<>();
+                item.put("from", fromHeader);
+                item.put("to", List.of(rec.trim()));
+                item.put("subject", subject != null && !subject.isBlank() ? subject : "New Message");
+                item.put("reply_to", replyTo);
+                item.put("text", content);
+                item.put("html", htmlContent);
+                if (resendAtts != null) {
+                    item.put("attachments", resendAtts);
+                }
+                batchPayload.add(item);
+            }
+
+            int currentBatchNum = (i / BATCH_SIZE) + 1;
+            log.info("[sendAnonymousEmailViaResend] Sending batch {}/{} ({} emails)", currentBatchNum, totalBatches, batchPayload.size());
+            List<Map<String, Object>> batchResp = sendViaResendBatchHttp(batchPayload);
+            if (batchResp != null) {
+                allResponses.addAll(batchResp);
+            }
+
+            // Respect Resend rate limits with a small breather between batch calls
+            if (end < recipients.size()) {
+                try {
+                    Thread.sleep(150);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+        }
+
         Map<String, Object> result = new HashMap<>();
         result.put("provider", "resend");
-        result.put("data", responseData);
+        result.put("totalRecipients", recipients.size());
+        result.put("batchCount", totalBatches);
+        result.put("data", Map.of(
+                "status", "sent",
+                "totalRecipients", recipients.size(),
+                "batchCount", totalBatches,
+                "batchResponsesCount", allResponses.size()
+        ));
         return result;
     }
 
-    private Map<String, Object> sendAnonymousEmailViaSmtp(String to, String subject, String content, String alias, String displayName, List<AttachmentDto> attachments) {
+    private Map<String, Object> sendAnonymousEmailViaSmtp(List<String> recipients, String subject, String content, String alias, String displayName, List<AttachmentDto> attachments) {
         try {
             String replyTo = alias + "@securesend.co.in";
-            MimeMessage mimeMessage = javaMailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, true, "UTF-8");
-            helper.setFrom(resendFrom, displayName);
-            helper.setReplyTo(replyTo);
-            helper.setTo(to);
-            helper.setSubject(subject != null && !subject.isBlank() ? subject : "New Message");
-            helper.setText(content, true);
+            int sentCount = 0;
+            for (String to : recipients) {
+                MimeMessage mimeMessage = javaMailSender.createMimeMessage();
+                MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, true, "UTF-8");
+                helper.setFrom(resendFrom, displayName);
+                helper.setReplyTo(replyTo);
+                helper.setTo(to.trim());
+                helper.setSubject(subject != null && !subject.isBlank() ? subject : "New Message");
+                helper.setText(content, true);
 
-            javaMailSender.send(mimeMessage);
+                javaMailSender.send(mimeMessage);
+                sentCount++;
+            }
 
             Map<String, Object> result = new HashMap<>();
             result.put("provider", "smtp");
-            result.put("data", Map.of("status", "sent"));
+            result.put("totalRecipients", recipients.size());
+            result.put("sentCount", sentCount);
+            result.put("data", Map.of("status", "sent", "count", sentCount));
             return result;
         } catch (Exception e) {
             log.error("SMTP anonymous mail send failed", e);
-            throw new ApiException("Failed to send anonymous email via SMTP.", HttpStatus.INTERNAL_SERVER_ERROR);
+            throw new ApiException("Failed to send anonymous email via SMTP: " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -201,6 +276,30 @@ public class MailService {
         } catch (Exception e) {
             log.error("Resend API request failed", e);
             throw new ApiException("Failed to send email via Resend: " + e.getMessage(), HttpStatus.BAD_GATEWAY);
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<Map<String, Object>> sendViaResendBatchHttp(List<Map<String, Object>> batchPayload) {
+        try {
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            headers.setBearerAuth(resendApiKey);
+
+            HttpEntity<List<Map<String, Object>>> entity = new HttpEntity<>(batchPayload, headers);
+            ResponseEntity<Map> response = restTemplate.exchange("https://api.resend.com/emails/batch", HttpMethod.POST, entity, Map.class);
+
+            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+                Object dataObj = response.getBody().get("data");
+                if (dataObj instanceof List) {
+                    return (List<Map<String, Object>>) dataObj;
+                }
+                return List.of(response.getBody());
+            }
+            throw new ApiException("Resend batch returned status: " + response.getStatusCode(), HttpStatus.BAD_GATEWAY);
+        } catch (Exception e) {
+            log.error("Resend Batch API request failed", e);
+            throw new ApiException("Failed to send batch emails via Resend: " + e.getMessage(), HttpStatus.BAD_GATEWAY);
         }
     }
 
